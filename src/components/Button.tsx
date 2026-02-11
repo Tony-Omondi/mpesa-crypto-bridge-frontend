@@ -4,83 +4,120 @@ import {
   TextStyle,
   TouchableOpacity,
   ViewStyle,
+  StyleSheet,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import {theme} from '@/src/constants';
 import {text} from '@/src/text';
+
+// --- THEME CONSTANTS ---
+const COLORS = {
+  primary: '#00D09C',
+  background: '#0F1115',
+  surface: '#1E293B',
+  error: '#EF4444',
+  textPrimary: '#FFFFFF',
+  textDark: '#00332a',
+  border: '#334155',
+};
 
 type Props = {
   label: string;
   onPress?: () => void;
   loading?: boolean;
+  disabled?: boolean;
   
   // Style Props
   containerStyle?: ViewStyle;
-  titleStyle?: TextStyle; // Backward compatibility
-  textStyle?: TextStyle;  // Forward compatibility (used in Onboarding)
+  textStyle?: TextStyle;
   
   // Variant
-  colorScheme?: 'primary' | 'secondary' | 'error';
-  version?: 'light' | 'orange'; // Kept for legacy code compatibility
+  colorScheme?: 'primary' | 'secondary' | 'error' | 'outline';
 };
 
 export const Button: React.FC<Props> = ({
   label,
   onPress,
-  titleStyle,
   textStyle,
   loading = false,
+  disabled = false,
   colorScheme = 'primary',
   containerStyle,
 }) => {
 
-  // 1. Determine Background Color based on Scheme
-  const getBackgroundColor = () => {
+  const handlePress = () => {
+    if (loading || disabled) return;
+    
+    // Provide tactile feedback for every button in the app globally
+    if (colorScheme === 'primary') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else {
+      Haptics.selectionAsync();
+    }
+    
+    onPress?.();
+  };
+
+  // Determine Background Colors
+  const getBtnStyles = () => {
     switch (colorScheme) {
       case 'primary':
-        return theme.colors.primary; // Neo Mint (#00D09C)
+        return {
+          backgroundColor: COLORS.primary,
+          borderWidth: 0,
+          // Primary Glow
+          shadowColor: COLORS.primary,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.3,
+          shadowRadius: 12,
+          elevation: 8,
+        };
       case 'error':
-        return theme.colors.error;   // M-Pesa Rose (#FF3B5C)
+        return {
+          backgroundColor: COLORS.error,
+          borderWidth: 0,
+        };
+      case 'outline':
+        return {
+          backgroundColor: 'transparent',
+          borderWidth: 1.5,
+          borderColor: COLORS.border,
+        };
       case 'secondary':
       default:
-        return theme.colors.card;    // Gunmetal (#1B2028)
+        return {
+          backgroundColor: COLORS.surface,
+          borderWidth: 1,
+          borderColor: COLORS.border,
+        };
     }
   };
 
-  // 2. Determine Text Color (Contrast)
+  // Determine Text Colors
   const getTextColor = () => {
+    if (disabled) return COLORS.textSecondary;
     switch (colorScheme) {
       case 'primary':
-        return theme.colors.eigengrau; // Dark text on Bright Green button
+        return COLORS.textDark;
+      case 'outline':
+        return COLORS.primary;
       default:
-        return theme.colors.white;     // White text on Dark buttons
+        return COLORS.textPrimary;
     }
   };
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={onPress}
-      disabled={loading}
-      style={{
-        height: 56, // Modern, taller touch target
-        backgroundColor: getBackgroundColor(),
-        borderRadius: theme.sizes.radius,
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexDirection: 'row',
-        
-        // Add "Authentic Glow" only for Primary buttons
-        ...(colorScheme === 'primary' && {
-          shadowColor: theme.colors.primary,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-          elevation: 4, // Android shadow
-        }),
-        
-        ...containerStyle,
-      }}
+      activeOpacity={0.85}
+      onPress={handlePress}
+      disabled={loading || disabled}
+      style={[
+        styles.base,
+        getBtnStyles(),
+        (disabled || loading) && styles.disabled,
+        containerStyle,
+      ]}
     >
       {loading ? (
         <ActivityIndicator
@@ -89,13 +126,11 @@ export const Button: React.FC<Props> = ({
         />
       ) : (
         <text.T16
-          style={{
-            color: getTextColor(),
-            fontWeight: '700', // Bold for Calls to Action
-            // Merge both style props to support all usages
-            ...titleStyle,
-            ...textStyle,
-          }}
+          style={[
+            styles.label,
+            { color: getTextColor() },
+            textStyle,
+          ]}
         >
           {label}
         </text.T16>
@@ -103,3 +138,22 @@ export const Button: React.FC<Props> = ({
     </TouchableOpacity>
   );
 };
+
+const styles = StyleSheet.create({
+  base: {
+    height: 58, // Taller, premium touch target
+    borderRadius: 20, // Modern rounded aesthetic
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+});

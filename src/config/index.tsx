@@ -5,7 +5,7 @@ const MAIN_URL = 'https://coinsafe-tron-server.vercel.app/';
 
 // 2. Your Local Django Backend (Use ngrok or your IP)
 // Ensure this matches your current Ngrok URL
-export const BASE_URL = 'https://9536-197-232-18-159.ngrok-free.app'; 
+export const BASE_URL = 'https://37f7-197-232-18-159.ngrok-free.app'; 
 
 export const CREATE_WALLET = `${BASE_URL}/api/wallet/create/`;
 export const RESTORE_WALLET = `${BASE_URL}/api/wallet/restore/`;

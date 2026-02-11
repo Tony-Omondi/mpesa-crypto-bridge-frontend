@@ -8,40 +8,48 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
+  Platform,
 } from 'react-native';
 import {Image} from 'expo-image';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import {Ionicons} from '@expo/vector-icons';
 
-import {text} from '@/src/text';
 import {theme} from '@/src/constants';
 import {useAppSelector} from '@/src/store';
-import {components} from '@/src/components';
 
-// --- UPDATED CONTENT FOR M-PESA & STABLECOIN CONTEXT ---
+const { width, height } = Dimensions.get('window');
+
+// --- THEME CONSTANTS ---
+const COLORS = {
+  background: '#0F1115',
+  primary: '#00D09C',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#94A3B8',
+  surface: '#1E293B',
+};
+
 const onboardingData = [
   {
     id: 1,
-    image: require('../../assets/images/01.png'), // Ensure this image represents "Mobile Money" or "Phone"
+    image: require('../../assets/images/01.png'),
     titleLine1: 'Instant Crypto via',
     titleLine2: 'M-Pesa!',
-    description1: 'Buy NiTokens ($NIT) directly using your',
-    description2: 'M-Pesa balance. No credit cards needed.',
+    description: 'Buy NiTokens ($NIT) directly using your M-Pesa balance. Safe, fast, and no credit cards required.',
   },
   {
     id: 2,
-    image: require('../../assets/images/02.png'), // Ensure this represents "Stability" or "Shield"
+    image: require('../../assets/images/02.png'),
     titleLine1: '1 KES = 1 NIT',
     titleLine2: 'Stable & Secure',
-    description1: 'Your digital shilling. Pegged 1:1 to KES.',
-    description2: 'Protect your savings from volatility.',
+    description: 'Your digital shilling. Pegged 1:1 to KES. Protect your savings from market volatility.',
   },
   {
     id: 3,
-    image: require('../../assets/images/03.png'), // Ensure this represents "Global" or "Speed"
+    image: require('../../assets/images/03.png'),
     titleLine1: 'Send Money,',
     titleLine2: 'Not Fees',
-    description1: 'Transfer value instantly to anyone.',
-    description2: 'Cash out to M-Pesa anytime, anywhere.',
+    description: 'Transfer value instantly to anyone on the network. Cash out to M-Pesa anytime, anywhere.',
   },
 ];
 
@@ -51,7 +59,6 @@ export default function Onboarding() {
 
   const {access} = useAppSelector((state) => state.walletReducer);
 
-  // Auto-redirect if user is already logged in
   useEffect(() => {
     if (access) {
       router.replace('/(tabs)/home');
@@ -59,214 +66,200 @@ export default function Onboarding() {
   }, [access]);
 
   const handleScroll = useCallback((event: any) => {
-    const slideWidth = Dimensions.get('window').width;
-    const currentIndex = Math.round(
-      event.nativeEvent.contentOffset.x / slideWidth,
-    );
-    setCurrentSlideIndex(currentIndex);
-  }, []);
+    const currentIndex = Math.round(event.nativeEvent.contentOffset.x / width);
+    if (currentIndex !== currentSlideIndex) {
+      setCurrentSlideIndex(currentIndex);
+      if (Platform.OS !== 'web') {
+        Haptics.selectionAsync();
+      }
+    }
+  }, [currentSlideIndex]);
 
-  const renderStatusBar = (): React.JSX.Element => {
-    return (
-      <StatusBar
-        barStyle='light-content'
-        backgroundColor={theme.colors.eigengrau}
-      />
-    );
-  };
-
-  const renderCarousel = (): React.JSX.Element => {
-    return (
-      <ScrollView
-        horizontal={true}
-        pagingEnabled={true}
-        onScroll={handleScroll}
-        scrollEventThrottle={16} // Smooths out the scroll event
-        showsHorizontalScrollIndicator={false}
-        style={styles.carousel}
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle='light-content' />
+      
+      {/* Skip Button */}
+      <TouchableOpacity 
+        style={styles.skipBtn} 
+        onPress={() => router.push('/(auth)/welcome')}
       >
-        {onboardingData.map((item) => {
-          return (
-            <View
-              key={item.id}
-              style={styles.carouselItem}
-            >
-              <View style={styles.imageContainer}>
-                  <Image
-                    source={item.image}
-                    contentFit="contain" // Ensures image doesn't get cut off
-                    style={styles.carouselImage}
-                  />
-              </View>
+        <Text style={styles.skipText}>Skip</Text>
+      </TouchableOpacity>
+
+      {/* Image Carousel */}
+      <View style={styles.carouselSection}>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          showsHorizontalScrollIndicator={false}
+        >
+          {onboardingData.map((item) => (
+            <View key={item.id} style={styles.slide}>
+              <Image
+                source={item.image}
+                contentFit="contain"
+                style={styles.image}
+              />
             </View>
-          );
-        })}
-      </ScrollView>
-    );
-  };
-
-  const renderDescription = (): React.JSX.Element => {
-    return (
-      <View style={styles.descriptionContainer}>
-        <View style={styles.textWrapper}>
-            <text.H1 style={styles.h1}>
-            {onboardingData[currentSlideIndex].titleLine1}
-            </text.H1>
-            <text.H1 style={styles.h1Bottom}>
-            {onboardingData[currentSlideIndex].titleLine2}
-            </text.H1>
-            <text.T16 style={styles.t16}>
-            {onboardingData[currentSlideIndex].description1}
-            </text.T16>
-            <text.T16 style={styles.t16}>
-            {onboardingData[currentSlideIndex].description2}
-            </text.T16>
-        </View>
+          ))}
+        </ScrollView>
       </View>
-    );
-  };
 
-  const renderDots = (): React.JSX.Element => {
-    return (
-      <View style={styles.dotsContainer}>
-        {onboardingData.map((_, index) => {
-          return (
+      {/* Text & Action Section */}
+      <View style={styles.detailsSection}>
+        
+        {/* Pagination Dots */}
+        <View style={styles.dotsRow}>
+          {onboardingData.map((_, index) => (
             <View
               key={index}
               style={[
                 styles.dot,
-                index === currentSlideIndex
-                  ? styles.dotActive
-                  : styles.dotInactive,
+                index === currentSlideIndex ? styles.activeDot : styles.inactiveDot,
               ]}
             />
-          );
-        })}
-      </View>
-    );
-  };
+          ))}
+        </View>
 
-  const renderButton = (): React.JSX.Element => {
-    return (
-      <View style={styles.buttonContainer}>
-        <components.Button
-          label='Get Started'
-          containerStyle={styles.mainButton} 
-          colorScheme='primary'
-          onPress={() => {
-            // Navigate to your Auth Welcome screen
-            router.push('/(auth)/welcome');
-          }}
-        />
-      </View>
-    );
-  };
+        <View style={styles.textContainer}>
+          <Text style={styles.title1}>
+            {onboardingData[currentSlideIndex].titleLine1}
+          </Text>
+          <Text style={styles.title2}>
+            {onboardingData[currentSlideIndex].titleLine2}
+          </Text>
+          <Text style={styles.description}>
+            {onboardingData[currentSlideIndex].description}
+          </Text>
+        </View>
 
-  return (
-    <SafeAreaView style={styles.safeAreaProvider}>
-      {renderStatusBar()}
-      
-      {/* Upper Section: Image Carousel */}
-      <View style={{flex: 2}}> 
-        {renderCarousel()}
+        {/* Footer Button */}
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={styles.getStartedBtn}
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.push('/(auth)/welcome');
+            }}
+          >
+            <Text style={styles.btnText}>Get Started</Text>
+            <Ionicons name="arrow-forward" size={20} color="#00332a" />
+          </TouchableOpacity>
+        </View>
       </View>
-
-      {/* Lower Section: Text, Dots, Button */}
-      <View style={styles.bottomSection}>
-        {renderDescription()}
-        {renderDots()}
-        {renderButton()}
-      </View>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeAreaProvider: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.eigengrau,
+    backgroundColor: COLORS.background,
   },
-  // --- CAROUSEL STYLES ---
-  carousel: {
-    flex: 1,
+  skipBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 20,
+    right: 24,
+    zIndex: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  carouselItem: {
-    width: Dimensions.get('window').width,
+  skipText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  carouselSection: {
+    flex: 1.2,
+    marginTop: 40,
+  },
+  slide: {
+    width: width,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  imageContainer: {
-    width: '100%',
-    height: '80%', // Takes up most of the top section
-    justifyContent: 'center',
-    alignItems: 'center',
+  image: {
+    width: width * 0.85,
+    height: '100%',
   },
-  carouselImage: {
-    width: Dimensions.get('window').width * 0.8,
-    height: '100%', 
+  detailsSection: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    paddingHorizontal: 32,
+    paddingTop: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 20,
   },
-
-  // --- BOTTOM SECTION STYLES ---
-  bottomSection: {
-    flex: 1.2, // Slightly larger to fit text and buttons comfortably
-    justifyContent: 'flex-start',
-    paddingTop: 20,
-  },
-  descriptionContainer: {
-    paddingHorizontal: 24,
-  },
-  textWrapper: {
-    // Optional: Center text if you prefer that look
-    // alignItems: 'center', 
-  },
-  h1: {
-    color: theme.colors.white,
-    fontSize: 32, // Make headline punchy
-    fontWeight: '700',
-  },
-  h1Bottom: {
-    color: '#00D09C', // Use a 'Crypto Green' or your primary brand color here
-    fontSize: 32,
-    fontWeight: '700',
-    marginBottom: 16,
-  },
-  t16: {
-    color: '#B4B4C6',
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  
-  // --- DOTS ---
-  dotsContainer: {
+  dotsRow: {
     flexDirection: 'row',
+    marginBottom: 32,
     gap: 8,
-    paddingHorizontal: 24,
-    marginTop: 30,
-    marginBottom: 30,
   },
   dot: {
     height: 6,
     borderRadius: 3,
   },
-  dotActive: {
-    width: 30, // Elongated active dot
-    backgroundColor: '#00D09C', // Match h1Bottom color
+  activeDot: {
+    width: 24,
+    backgroundColor: COLORS.primary,
   },
-  dotInactive: {
-    width: 6, // Circle inactive dot
-    backgroundColor: `${theme.colors.white}30`,
+  inactiveDot: {
+    width: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
-
-  // --- BUTTON ---
-  buttonContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 20,
-    marginTop: 'auto', // Pushes button to bottom of safe area
+  textContainer: {
+    flex: 1,
   },
-  mainButton: {
-    width: '100%', // Full width button looks better for onboarding
-    height: 56,
-    borderRadius: 16,
+  title1: {
+    color: COLORS.textPrimary,
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  title2: {
+    color: COLORS.primary,
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 16,
+    letterSpacing: -0.5,
+  },
+  description: {
+    color: COLORS.textSecondary,
+    fontSize: 16,
+    lineHeight: 24,
+    fontWeight: '400',
+  },
+  footer: {
+    paddingBottom: 40,
+  },
+  getStartedBtn: {
+    backgroundColor: COLORS.primary,
+    height: 60,
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  btnText: {
+    color: '#00332a',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

@@ -1,14 +1,34 @@
-import {useRouter} from 'expo-router';
-import {TextInput, View, StyleSheet, StatusBar} from 'react-native';
 import React, {useState, useEffect} from 'react';
+import {
+  TextInput,
+  View,
+  Text,
+  StyleSheet,
+  StatusBar,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import {useRouter} from 'expo-router';
 import {showMessage} from 'react-native-flash-message';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {Ionicons} from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 
-import {theme} from '@/src/constants';
 import {useAppSelector} from '@/src/store';
 import {validation} from '@/src/validation';
-import {components} from '@/src/components';
+
+// --- THEME CONSTANTS ---
+const COLORS = {
+  background: '#0F1115',
+  primary: '#00D09C',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#94A3B8',
+  surface: '#1E293B',
+  border: '#334155',
+  error: '#EF4444',
+};
 
 export default function RestoreWithMnemonic() {
   const router = useRouter();
@@ -26,94 +46,229 @@ export default function RestoreWithMnemonic() {
     const message = validation.mnemonic(mnemonic);
 
     if (message) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       showMessage({
-        message: message,
+        message: 'Invalid Phrase',
+        description: message,
         type: 'danger',
-        backgroundColor: theme.colors.error,
+        backgroundColor: COLORS.error,
       });
       return;
     }
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.replace({pathname: '/(loading)/restoreWallet', params: {mnemonic}});
   };
 
-  const renderContent = () => {
-    return (
+  const handlePaste = async () => {
+    const text = await Clipboard.getStringAsync();
+    if (text) {
+      setMnemonic(text);
+      Haptics.selectionAsync();
+      showMessage({
+        message: 'Phrase Pasted',
+        type: 'info',
+        backgroundColor: COLORS.surface,
+      });
+    }
+  };
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={() => router.back()} 
+        style={styles.backButton}
+      >
+        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Import Wallet</Text>
+      <View style={{ width: 40 }} /> 
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" />
+      {renderHeader()}
+
       <KeyboardAwareScrollView
         contentContainerStyle={styles.scrollContent}
         enableOnAndroid={true}
         extraScrollHeight={20}
         keyboardShouldPersistTaps="handled"
       >
-        <components.Reminder containerStyle={{marginBottom: 20}}>
-          Enter your 12-word Secret Phrase to regain access to your CoinSafe wallet.
-        </components.Reminder>
+        {/* Instruction Card */}
+        <View style={styles.infoCard}>
+          <Ionicons name="key-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.infoText}>
+            Type your 12-word recovery phrase in the correct order, separated by spaces.
+          </Text>
+        </View>
 
-        <TextInput
-          style={styles.input}
-          multiline={true}
-          value={mnemonic}
-          autoCorrect={false}
-          autoCapitalize='none'
-          keyboardType='default'
-          returnKeyType='done'
-          blurOnSubmit={true}
-          onChangeText={setMnemonic}
-          placeholderTextColor={theme.colors.textSecondary} // Silver color for placeholder
-          placeholder='e.g. witch collapse practice feed shame...'
-        />
+        {/* Input Box */}
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            multiline={true}
+            value={mnemonic}
+            autoCorrect={false}
+            autoCapitalize='none'
+            keyboardType='default'
+            placeholderTextColor="#4B5563"
+            placeholder='e.g. witch collapse practice feed shame...'
+            onChangeText={setMnemonic}
+            blurOnSubmit={true}
+          />
+          
+          <TouchableOpacity 
+            style={styles.pasteBtn} 
+            onPress={handlePaste}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="clipboard-outline" size={16} color={COLORS.primary} />
+            <Text style={styles.pasteBtnText}>PASTE FROM CLIPBOARD</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Security Warning */}
+        <View style={styles.securityNote}>
+            <Ionicons name="shield-checkmark-outline" size={14} color={COLORS.textSecondary} />
+            <Text style={styles.securityNoteText}>
+                Your phrase is processed locally and never leaves this device.
+            </Text>
+        </View>
+
       </KeyboardAwareScrollView>
-    );
-  };
 
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
-      
-      <components.Header
-        title='Restore Wallet'
-        showGoBack={true}
-      />
-
-      {renderContent()}
-
+      {/* Footer Action */}
       <View style={styles.footer}>
-        <components.Button
-          label='Restore Wallet'
-          onPress={handleRestore}
-          colorScheme='primary'
-          // Ensure Button is Round and Text is Dark (Contrast)
-          containerStyle={{ borderRadius: 50, height: 56 }} 
-          textStyle={{ color: theme.colors.eigengrau, fontWeight: '700' }}
-        />
+        <TouchableOpacity 
+            style={[styles.restoreBtn, !mnemonic && styles.disabledBtn]}
+            onPress={handleRestore}
+            disabled={!mnemonic}
+        >
+          <Text style={styles.restoreBtnText}>Restore Wallet</Text>
+          <Ionicons name="sync-outline" size={20} color="#00332a" />
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: theme.colors.background, // Deep Space #0B0E11
+  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  headerTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
   },
   scrollContent: {
     flexGrow: 1,
-    paddingVertical: 10,
-    paddingHorizontal: theme.sizes.padding,
+    paddingHorizontal: 24,
+    paddingTop: 10,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0, 208, 156, 0.1)',
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 208, 156, 0.2)',
+  },
+  infoText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  inputWrapper: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 4,
+    minHeight: 200,
   },
   input: {
-    height: 140,
-    backgroundColor: theme.colors.card, // Gunmetal #1B2028
-    padding: 16,
-    borderRadius: theme.sizes.radius,
-    color: theme.colors.white, // FIXED: Input text is now WHITE
+    flex: 1,
+    color: COLORS.textPrimary,
     fontSize: 16,
+    padding: 16,
     textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    lineHeight: 24,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  pasteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  pasteBtnText: {
+    color: COLORS.primary,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    gap: 8,
+    opacity: 0.6,
+  },
+  securityNoteText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
   },
   footer: {
-    padding: theme.sizes.padding,
-    paddingBottom: 20,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  },
+  restoreBtn: {
+    backgroundColor: COLORS.primary,
+    height: 60,
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  disabledBtn: {
+    backgroundColor: COLORS.surface,
+    opacity: 0.5,
+  },
+  restoreBtnText: {
+    color: '#00332a',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });

@@ -1,58 +1,69 @@
-// src/constants/theme.ts
+import { Dimensions } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 const palette = {
   // --- BRAND IDENTITY ---
-  neoMint: '#00D09C',    // Primary: Crypto, Growth, Buy, Success
-  mpesaRose: '#FF3B5C',  // Secondary: Fiat, Sell, Withdraw, Error
-  deepSpace: '#0B0E11',  // Background: Secure, Deep Dark
-  gunmetal: '#1B2028',   // Surface: Cards, Inputs, Modals
+  neoMint: '#00D09C',    // Primary: Success, Active, Primary Buttons
+  mpesaRose: '#EF4444',  // Error: Alerts, Sell, Negative Trends (Improved accessibility)
+  deepSpace: '#0F1115',  // Background: Deep Dark OLED
+  gunmetal: '#1E293B',   // Surface: Cards, Inputs, Modals
+  slate: '#334155',      // Borders: Subtle dividers
   
   // --- NEUTRALS ---
-  starlight: '#F5F7FA',  // Main Text (Readable White)
-  silver: '#9CA3AF',     // Secondary Text (Muted)
-  onyx: '#2A303C',       // Borders, Dividers
+  starlight: '#FFFFFF',  // Main Text (Pure White for OLED pop)
+  silver: '#94A3B8',     // Secondary Text (Muted Slate)
   
   // --- UTILITY ---
-  white: '#FFFFFF',
+  warning: '#F59E0B',    // Amber for security reminders
+  info: '#3B82F6',       // Blue for informational tips
   transparent: 'transparent',
 };
 
 export const colors = {
   // 1. Core Backgrounds
-  eigengrau: palette.deepSpace,  // Main App Background
-  secondaryColor: palette.gunmetal, // Card Background
-  imageBackground: palette.gunmetal, 
+  background: palette.deepSpace,  
+  eigengrau: palette.deepSpace,   // Compatibility with legacy code
+  surface: palette.gunmetal,      
+  secondaryColor: palette.gunmetal, 
 
-  // 2. Text Colors
-  white: palette.white,
-  textColor: palette.starlight,   // Headings
-  bodyTextColor: palette.silver,  // Paragraphs
-  
-  // 3. Brand Accents
-  primary: palette.neoMint,       // USE THIS for "Get Started" / "Buy"
-  accentColor: palette.neoMint,   // Kept for backward compatibility
-  
-  // 4. Functional Colors
-  vividTangerine: palette.mpesaRose, // USE THIS for "Withdraw" / "Sell"
+  // 2. Interactive / Action
+  primary: palette.neoMint,       
+  accentColor: palette.neoMint,
   error: palette.mpesaRose,
+  warning: palette.warning,
+  info: palette.info,
+
+  // 3. Text
+  textPrimary: palette.starlight,   // Headers
+  textColor: palette.starlight,     // Compatibility
+  textSecondary: palette.silver,    // Body/Labels
+  bodyTextColor: palette.silver,    // Compatibility
   
-  // 5. Borders & Dividers
-  onyx: palette.onyx,
+  // 4. Borders & Glass
+  border: palette.slate,
+  divider: 'rgba(255, 255, 255, 0.05)', // Super subtle lines
+  glass: 'rgba(255, 255, 255, 0.03)',   // For frosted glass effects
   
-  // 6. Extras (Kept for compatibility, but harmonized)
-  apricot: '#FFD9C3', 
-  transparent: 'transparent',
+  // 5. Utility
+  white: '#FFFFFF',
+  black: '#000000',
+  transparent: palette.transparent,
 };
 
 export const theme = {
   colors,
   sizes: {
+    width,
+    height,
     base: 16,
-    radius: 16,
+    radius: 20,         // Modern, more rounded corners
     padding: 24,
-    h1: 34,
+    h1: 32,
     h2: 24,
     t16: 16,
+    t14: 14,
+    t12: 12,
   },
   spacing: {
     xs: 4,
@@ -62,4 +73,10 @@ export const theme = {
     xl: 32,
     xxl: 40,
   },
+  // Added fonts structure for cleaner usage in styles
+  fonts: {
+    SourceSans3_400Regular: { fontFamily: 'SourceSans3-Regular' },
+    SourceSans3_600SemiBold: { fontFamily: 'SourceSans3-SemiBold' },
+    SourceSans3_700Bold: { fontFamily: 'SourceSans3-Bold' },
+  }
 };

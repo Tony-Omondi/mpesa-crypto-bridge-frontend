@@ -6,17 +6,29 @@ import {
   Text,
   StatusBar,
   Dimensions,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
 import {Image} from 'expo-image';
 import {useRouter} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {Ionicons} from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
-import {text} from '@/src/text';
 import {theme} from '@/src/constants';
 import {useAppSelector} from '@/src/store';
-import {components} from '@/src/components';
 
 const {width, height} = Dimensions.get('window');
+
+// --- THEME CONSTANTS ---
+const COLORS = {
+  background: '#0F1115',
+  primary: '#00D09C',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#94A3B8',
+  surface: '#1E293B',
+  border: '#334155',
+};
 
 export default function Welcome() {
   const router = useRouter();
@@ -28,118 +40,170 @@ export default function Welcome() {
     }
   }, [access]);
 
-  const renderContent = () => {
-    return (
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* --- HEADER SECTION --- */}
-        <View style={styles.headerContainer}>
-            <Image
-                // Ensure this image is white or light colored, otherwise it might be hard to see too!
-                source={require('../../assets/icons/03.png')} 
-                contentFit="contain"
-                style={styles.logo}
-            />
-            
-            <text.H1 style={styles.title}>
-                Welcome To <Text style={{color: theme.colors.primary}}>CoinSafe</Text>
-            </text.H1>
-            
-            {/* FIXED: Text color is now explicitly White/Silver for readability */}
-            <text.T16 style={styles.subtitle}>
-                Create a new crypto wallet in just a few steps or regain access to
-                your crypto wallet.
-            </text.T16>
-        </View>
-
-        {/* --- BUTTONS ROW (Side by Side) --- */}
-        <View style={styles.rowContainer}>
-          
-          {/* 1. New Wallet (Green, Rounded) */}
-          <View style={styles.buttonWrapper}>
-            <components.Button
-                label="New Wallet"
-                colorScheme="primary"
-                onPress={() => router.push('/(loading)/createWallet')}
-                containerStyle={styles.roundButton} 
-                textStyle={{ color: theme.colors.eigengrau, fontWeight: '700' }}
-            />
-          </View>
-
-          {/* 2. Restore Wallet (Dark, Rounded) */}
-          <View style={styles.buttonWrapper}>
-            <components.Button
-                label="Restore"
-                colorScheme="secondary"
-                onPress={() => router.push('/(auth)/restoreWithMnemonic')}
-                containerStyle={styles.roundButton}
-                textStyle={{ color: theme.colors.white, fontWeight: '600' }}
-            />
-          </View>
-
-        </View>
-      </ScrollView>
-    );
+  const handlePress = (route: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(route);
   };
 
   return (
-    <SafeAreaView style={styles.safeAreaProvider}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
-      {renderContent()}
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      
+      {/* Background Decorative Glow */}
+      <View style={styles.glow} />
+
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.mainContent}>
+            {/* Logo Section */}
+            <View style={styles.logoContainer}>
+                <Image
+                    source={require('../../assets/icons/03.png')} 
+                    contentFit="contain"
+                    style={styles.logo}
+                />
+            </View>
+            
+            {/* Text Section */}
+            <View style={styles.textSection}>
+                <Text style={styles.title}>
+                    Welcome to <Text style={{color: COLORS.primary}}>CoinSafe</Text>
+                </Text>
+                
+                <Text style={styles.subtitle}>
+                    The safest way to manage your assets. Create a new wallet or restore an existing one to get started.
+                </Text>
+            </View>
+        </View>
+
+        {/* Action Section */}
+        <View style={styles.footer}>
+            <TouchableOpacity 
+                style={styles.primaryBtn}
+                activeOpacity={0.8}
+                onPress={() => handlePress('/(loading)/createWallet')}
+            >
+                <Text style={styles.primaryBtnText}>Create New Wallet</Text>
+                <Ionicons name="add-circle-outline" size={20} color="#00332a" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+                style={styles.secondaryBtn}
+                activeOpacity={0.7}
+                onPress={() => handlePress('/(auth)/restoreWithMnemonic')}
+            >
+                <Text style={styles.secondaryBtnText}>I already have a wallet</Text>
+            </TouchableOpacity>
+            
+            <Text style={styles.legalText}>
+                By continuing, you agree to our Terms and Privacy Policy.
+            </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeAreaProvider: {
+  container: {
     flex: 1,
-    backgroundColor: theme.colors.background, // Deep Space (#0B0E11)
+    backgroundColor: COLORS.background,
+  },
+  glow: {
+    position: 'absolute',
+    top: -height * 0.1,
+    right: -width * 0.2,
+    width: width * 0.8,
+    height: width * 0.8,
+    borderRadius: width * 0.4,
+    backgroundColor: COLORS.primary,
+    opacity: 0.05,
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
+    justifyContent: 'space-between',
+    paddingBottom: 40,
+  },
+  mainContent: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: 60,
   },
-  
-  // --- HEADER STYLES ---
-  headerContainer: {
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: height * 0.05,
+  logoContainer: {
+    marginBottom: 40,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
   },
   logo: {
     width: width * 0.35,
     height: width * 0.35,
-    marginBottom: 30,
+  },
+  textSection: {
+    alignItems: 'center',
   },
   title: {
+    color: COLORS.textPrimary,
+    fontSize: 34,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 14,
-    color: theme.colors.white, // Ensure Title is White
-    fontSize: 32,
+    marginBottom: 16,
+    letterSpacing: -1,
   },
   subtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 16,
     textAlign: 'center',
-    color: '#B4B4C6', // FIXED: Hardcoded light silver to guarantee visibility on black
     lineHeight: 24,
-    maxWidth: '90%', 
+    paddingHorizontal: 10,
   },
-
-  // --- ROW LAYOUT FOR BUTTONS ---
-  rowContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  footer: {
     width: '100%',
-    gap: 12,
+    gap: 16,
   },
-  buttonWrapper: {
-    flex: 1, 
+  primaryBtn: {
+    backgroundColor: COLORS.primary,
+    height: 60,
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 10,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  roundButton: {
-    height: 50,
-    borderRadius: 50, // Pill Shape
+  primaryBtnText: {
+    color: '#00332a',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  secondaryBtn: {
+    height: 60,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  secondaryBtnText: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  legalText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    textAlign: 'center',
+    opacity: 0.6,
+    marginTop: 8,
   },
 });

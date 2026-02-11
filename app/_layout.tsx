@@ -2,14 +2,15 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { Provider } from 'react-redux';
-import { PersistGate } from 'redux-persist/integration/react'; // ADDED
+import { PersistGate } from 'redux-persist/integration/react';
 import * as SplashScreen from 'expo-splash-screen';
 import FlashMessage from 'react-native-flash-message';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
-import { store, persistor } from '@/src/store'; // ADDED persistor
-import { theme } from '@/src/constants';
+import { store, persistor } from '@/src/store';
 
+// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -36,25 +37,42 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <Provider store={store}>
-        {/* PersistGate delays rendering until the wallet keys are loaded from storage */}
+        {/* PersistGate ensures your wallet keys are restored before the UI renders */}
         <PersistGate loading={null} persistor={persistor}>
+          <StatusBar style="light" />
           <Stack
             screenOptions={{
               headerShown: false,
-              contentStyle: { flex: 1, backgroundColor: theme.colors.eigengrau },
+              // Swapping eigengrau for the new premium deep dark background
+              contentStyle: { flex: 1, backgroundColor: '#0F1115' },
+              animation: 'fade_from_bottom', // Smoother transition for fintech feel
             }}
           >
-            <Stack.Screen name="(auth)/onboarding" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)/welcome" options={{ headerShown: false }} />
-            <Stack.Screen name="logOut" options={{ headerShown: false }} />
-            <Stack.Screen name="(loading)/createWallet" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)/restoreWithMnemonic" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)/editProfile" options={{ headerShown: false }} />
+            {/* Auth Group */}
+            <Stack.Screen name="(auth)/onboarding" />
+            <Stack.Screen name="(auth)/welcome" />
+            <Stack.Screen name="(auth)/restoreWithMnemonic" />
+            <Stack.Screen name="(auth)/editProfile" />
+            
+            {/* Main App */}
+            <Stack.Screen name="(tabs)" />
+            
+            {/* Action Screens */}
+            <Stack.Screen name="logOut" />
+            <Stack.Screen name="(loading)/createWallet" />
+            
+            {/* Add these if they are separate from tabs */}
+            <Stack.Screen name="enterAddress" options={{ presentation: 'card' }} />
+            <Stack.Screen name="enterAmount" options={{ presentation: 'card' }} />
+            <Stack.Screen name="confirmTransaction" options={{ presentation: 'card' }} />
           </Stack>
         </PersistGate>
       </Provider>
-      <FlashMessage position="top" />
+      <FlashMessage 
+        position="top" 
+        statusBarHeight={StatusBar.currentHeight} 
+        floating={true} 
+      />
     </SafeAreaProvider>
   );
 }

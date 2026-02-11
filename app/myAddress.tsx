@@ -1,25 +1,41 @@
-import {Image} from 'expo-image';
-import {useRouter} from 'expo-router';
-import React, {useEffect} from 'react';
+import React, { useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  ScrollView, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Share,
+  StatusBar,
+  Dimensions
+} from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import {showMessage} from 'react-native-flash-message';
-import {View, ScrollView, StyleSheet} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { showMessage } from 'react-native-flash-message';
 
-import {text} from '@/src/text';
-import {theme} from '@/src/constants';
-import {useAppSelector} from '@/src/store';
-import {components} from '@/src/components';
+import { useAppSelector } from '@/src/store';
+
+// --- THEME CONSTANTS ---
+const COLORS = {
+  background: '#0F1115',
+  primary: '#00D09C',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#94A3B8',
+  surface: '#1E293B',
+  border: '#334155',
+  warning: '#F59E0B',
+};
+
+const { width } = Dimensions.get('window');
 
 export default function MyAddress() {
   const router = useRouter();
+  const { walletAddress, access } = useAppSelector((state) => state.walletReducer);
 
-  const walletAddress = useAppSelector(
-    (state) => state.walletReducer.walletAddress,
-  );
-
-  const {access} = useAppSelector((state) => state.walletReducer);
   useEffect(() => {
     if (!access) {
       router.replace('/(auth)/welcome');
@@ -27,133 +43,259 @@ export default function MyAddress() {
   }, [access]);
 
   const copyToClipboard = async () => {
+    Haptics.selectionAsync();
     await Clipboard.setStringAsync(walletAddress || '');
     showMessage({
-      message: 'Success',
+      message: 'Copied',
       description: 'Address copied to clipboard',
       type: 'success',
+      backgroundColor: COLORS.primary,
       icon: 'success',
     });
   };
 
+  const shareAddress = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await Share.share({
+        message: walletAddress || '',
+      });
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
   const renderHeader = () => (
-    <components.Header
-      showGoBack={true}
-      title='My Address'
-    />
-  );
-
-  const renderReminder = () => (
-    <View style={styles.reminderContainer}>
-      <components.Reminder>
-        Only send TRON (TRX) to this address. Sending any other asset will
-        result in a loss of funds.
-      </components.Reminder>
-    </View>
-  );
-
-  const renderContent = () => (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <View style={styles.tokenRow}>
-        <View style={styles.tokenInfo}>
-          <Image
-            source={{
-              uri: 'https://static.tronscan.org/production/logo/trx.png',
-            }}
-            style={styles.tokenLogo}
-          />
-          <text.T12>TRON</text.T12>
-        </View>
-        <View style={styles.tokenBadge}>
-          <text.T12>TRX</text.T12>
-        </View>
-      </View>
-      <QRCode
-        logoSize={40}
-        color={theme.colors.white}
-        value={walletAddress || ''}
-        size={theme.sizes.deviceWidth * 0.4}
-        backgroundColor={theme.colors.transparent}
-      />
-      <View style={styles.addressBox}>
-        <text.T12 numberOfLines={2}>{walletAddress}</text.T12>
-      </View>
-    </ScrollView>
-  );
-
-  const renderButton = () => (
-    <View style={styles.buttonContainer}>
-      <components.Button
-        label='Copy Address'
-        onPress={copyToClipboard}
-      />
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={() => router.back()} 
+        style={styles.backButton}
+      >
+        <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
+      </TouchableOpacity>
+      <Text style={styles.headerTitle}>Receive Assets</Text>
+      <View style={{ width: 40 }} /> 
     </View>
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       {renderHeader()}
-      {renderReminder()}
-      {renderContent()}
-      {renderButton()}
+
+      <ScrollView contentContainerStyle={styles.content}>
+        
+        {/* Network Warning Pill */}
+        <View style={styles.networkPill}>
+            <View style={styles.dot} />
+            <Text style={styles.networkText}>Arbitrum Sepolia Network</Text>
+        </View>
+
+        <Text style={styles.instructionText}>
+            Scan this code to deposit funds
+        </Text>
+
+        {/* QR Code Card */}
+        <View style={styles.qrCard}>
+            <View style={styles.qrContainer}>
+                <QRCode
+                    value={walletAddress || '0x'}
+                    size={width * 0.6}
+                    color="black"
+                    backgroundColor="white"
+                />
+            </View>
+        </View>
+
+        {/* Address Container */}
+        <View style={styles.addressContainer}>
+            <Text style={styles.addressLabel}>Your Address</Text>
+            <View style={styles.addressBox}>
+                <Text style={styles.addressText}>{walletAddress}</Text>
+            </View>
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
+                <View style={styles.iconCircle}>
+                    <Ionicons name="copy-outline" size={24} color={COLORS.primary} />
+                </View>
+                <Text style={styles.actionText}>Copy</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionButton} onPress={shareAddress}>
+                <View style={styles.iconCircle}>
+                    <Ionicons name="share-social-outline" size={24} color={COLORS.primary} />
+                </View>
+                <Text style={styles.actionText}>Share</Text>
+            </TouchableOpacity>
+        </View>
+
+        {/* Warning Footer */}
+        <View style={styles.warningBox}>
+            <Ionicons name="alert-circle-outline" size={20} color={COLORS.warning} />
+            <Text style={styles.warningText}>
+                Send only supported assets to this address. Sending other tokens may result in permanent loss.
+            </Text>
+        </View>
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
+  safeArea: { flex: 1, backgroundColor: COLORS.background },
+  
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
-  reminderContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  tokenRow: {
-    display: 'flex',
+  headerTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+
+  content: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+
+  // Network Pill
+  networkPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
-    gap: 9,
+    backgroundColor: 'rgba(0, 208, 156, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 20,
+    marginBottom: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 208, 156, 0.2)',
   },
-  tokenInfo: {
-    flexDirection: 'row',
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.primary,
+  },
+  networkText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  instructionText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    marginBottom: 24,
+  },
+
+  // QR Card
+  qrCard: {
+    padding: 20,
+    backgroundColor: '#FFF', // White bg for best QR contrast
+    borderRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    marginBottom: 30,
+  },
+  qrContainer: {
+    overflow: 'hidden',
+  },
+
+  // Address Box
+  addressContainer: {
+    width: '100%',
     alignItems: 'center',
-    gap: 7,
+    marginBottom: 30,
   },
-  tokenLogo: {
-    width: 13,
-    height: 13,
-    borderRadius: 8,
-  },
-  tokenBadge: {
-    backgroundColor: '#1B2028',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
+  addressLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   addressBox: {
-    paddingHorizontal: 10,
-    paddingVertical: 9,
-    marginTop: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: '#1B2028',
-    width: theme.sizes.deviceWidth * 0.4,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    width: '100%',
   },
-  buttonContainer: {
-    padding: 20,
+  addressText: {
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    fontSize: 13,
+    fontFamily: 'monospace', // Monospace for addresses
+    lineHeight: 20,
+  },
+
+  // Actions
+  actionRow: {
+    flexDirection: 'row',
+    gap: 40,
+    marginBottom: 40,
+  },
+  actionButton: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  actionText: {
+    color: COLORS.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Warning Footer
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    padding: 16,
+    borderRadius: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+  },
+  warningText: {
+    flex: 1,
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
 });

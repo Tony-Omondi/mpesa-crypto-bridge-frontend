@@ -1,22 +1,61 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { 
+  Text, 
+  View, 
+  ActivityIndicator, 
+  StyleSheet, 
+  StatusBar, 
+  Animated, 
+  Easing 
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { showMessage } from 'react-native-flash-message';
 import axios from 'axios';
-import {useRouter} from 'expo-router';
-import React, {useEffect} from 'react';
-import {Text, View, ActivityIndicator, StyleSheet, StatusBar} from 'react-native';
-import {showMessage} from 'react-native-flash-message';
-import {SafeAreaView} from 'react-native-safe-area-context';
 
-import {URLS} from '@/src/config';
-import {theme} from '@/src/constants';
-import {useAppDispatch} from '@/src/store';
-import {walletActions} from '@/src/store/walletSlice';
+import { URLS } from '@/src/config';
+import { useAppDispatch } from '@/src/store';
+import { walletActions } from '@/src/store/walletSlice';
+
+// --- THEME CONSTANTS ---
+const COLORS = {
+  background: '#0F1115',
+  primary: '#00D09C',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#94A3B8',
+  surface: '#1E293B',
+  border: '#334155',
+};
 
 export default function CreateWallet() {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  
+  // UX State: Show what the app is currently doing
+  const [loadingStep, setLoadingStep] = useState(0);
+  const steps = [
+    "Generating cryptographic keys...",
+    "Securing mnemonic phrase...",
+    "Finalizing your vault...",
+    "Almost there..."
+  ];
+
+  // Animation Values
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Start Pulsing Animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
+
     if (!URLS.REGISTER) {
-      console.error("Critical Error: URLS.REGISTER is undefined. Check config.ts");
+      console.error("Critical Error: URLS.REGISTER is undefined.");
       return;
     }
     setupNewAccount();
@@ -24,20 +63,23 @@ export default function CreateWallet() {
 
   const setupNewAccount = async () => {
     try {
-      // 1. GENERATE BLOCKCHAIN KEYS
-      console.log("Generating blockchain keys...");
+      // Step 1: Logic Start
+      setLoadingStep(0);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
       const walletResponse = await axios.get(URLS.CREATE_WALLET);
-      
       const { address, privateKey, mnemonic } = walletResponse.data;
       const finalPhrase = typeof mnemonic === 'object' ? mnemonic.phrase : mnemonic;
 
-      // 2. GENERATE A RANDOM UNIQUE PHONE NUMBER (FOR TESTING ONLY)
-      // This prevents "400 Bad Request" unique constraint errors in Django
+      // Step 2: Intermediate
+      setLoadingStep(1);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
       const randomSuffix = Math.floor(1000000 + Math.random() * 9000000); 
       const uniqueTestPhone = `2547${randomSuffix}`;
 
-      // 3. REGISTER USER IN DJANGO DB
-      console.log(`Registering new user: ${uniqueTestPhone}`);
+      // Step 3: Registration
+      setLoadingStep(2);
       const authResponse = await axios.post(URLS.REGISTER, {
         phone_number: uniqueTestPhone,
         password: "secure_password_123", 
@@ -45,50 +87,150 @@ export default function CreateWallet() {
       });
 
       if (authResponse.data.status === "Account Created") {
-        console.log("Success! Django user created.");
+        setLoadingStep(3);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
-        // 4. SAVE EVERYTHING TO REDUX
-        // Storing the token is CRITICAL to fix "401 Unauthorized" later
+        // Save to Redux
         dispatch(walletActions.setAuthToken(authResponse.data.token)); 
         dispatch(walletActions.setWalletAddress(address));
         dispatch(walletActions.setMnemonicPhrase(finalPhrase)); 
         dispatch(walletActions.setPrivateKey(privateKey));
 
-        // 5. REDIRECT TO BACKUP SCREEN
+        // Redirect
         setTimeout(() => {
             router.replace({
               pathname: '/(auth)/backupWallet',
               params: { phrase: finalPhrase }
             });
-        }, 1000);
+        }, 1500);
       }
     } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-      console.error('Setup Error Detail:', errorDetail);
       
       showMessage({
-        message: 'Account Setup Failed',
-        description: `Error: ${errorDetail}`,
+        message: 'Setup Failed',
+        description: 'We encountered an error creating your vault.',
         type: 'danger',
-        backgroundColor: theme.colors.error,
+        backgroundColor: '#EF4444',
       });
-      setTimeout(() => router.replace('/(auth)/welcome'), 4000);
+      setTimeout(() => router.replace('/(auth)/welcome'), 3000);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
+      <StatusBar barStyle="light-content" />
+      
       <View style={styles.content}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.text}>Building your secure vault...</Text>
+        {/* Pulsing Shield Icon */}
+        <Animated.View style={[styles.iconWrapper, { transform: [{ scale: pulseAnim }] }]}>
+          <View style={styles.glow} />
+          <Ionicons name="shield-checkmark" size={80} color={COLORS.primary} />
+        </Animated.View>
+
+        {/* Dynamic Text Section */}
+        <View style={styles.textSection}>
+            <Text style={styles.title}>Creating Wallet</Text>
+            <Text style={styles.subtitle}>{steps[loadingStep]}</Text>
+        </View>
+
+        {/* Progress Dots */}
+        <View style={styles.progressRow}>
+            {steps.map((_, i) => (
+                <View 
+                    key={i} 
+                    style={[
+                        styles.dot, 
+                        loadingStep === i ? styles.activeDot : (loadingStep > i ? styles.completedDot : styles.inactiveDot)
+                    ]} 
+                />
+            ))}
+        </View>
+
+        {/* Traditional Indicator as secondary */}
+        <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 40 }} />
+      </View>
+
+      <View style={styles.footer}>
+        <Ionicons name="lock-closed-outline" size={14} color={COLORS.textSecondary} />
+        <Text style={styles.footerText}>AES-256 Bit Encryption</Text>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 20 },
-  text: { color: theme.colors.textSecondary, fontSize: 16, fontWeight: '600' }
+  container: { flex: 1, backgroundColor: COLORS.background },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  
+  iconWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  glow: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.primary,
+    opacity: 0.1,
+  },
+
+  textSection: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  title: {
+    color: COLORS.textPrimary,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    textAlign: 'center',
+    height: 20, // Prevents layout jump when text changes
+  },
+
+  progressRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 30,
+  },
+  dot: {
+    height: 4,
+    borderRadius: 2,
+  },
+  inactiveDot: {
+    width: 12,
+    backgroundColor: COLORS.border,
+  },
+  activeDot: {
+    width: 24,
+    backgroundColor: COLORS.primary,
+  },
+  completedDot: {
+    width: 12,
+    backgroundColor: COLORS.primary,
+    opacity: 0.5,
+  },
+
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: 40,
+  },
+  footerText: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    fontWeight: '600',
+    opacity: 0.5,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  }
 });
