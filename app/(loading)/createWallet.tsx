@@ -90,8 +90,15 @@ export default function CreateWallet() {
         setLoadingStep(3);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         
-        // Save to Redux
-        dispatch(walletActions.setAuthToken(authResponse.data.token)); 
+        // --- NEW JWT TOKEN LOGIC HERE ---
+        // Grab the access token and save it
+        dispatch(walletActions.setAuthToken(authResponse.data.access)); 
+        
+        // Optional but recommended: Save the refresh token to your store/secure storage
+        if (walletActions.setRefreshToken) {
+          dispatch(walletActions.setRefreshToken(authResponse.data.refresh));
+        }
+
         dispatch(walletActions.setWalletAddress(address));
         dispatch(walletActions.setMnemonicPhrase(finalPhrase)); 
         dispatch(walletActions.setPrivateKey(privateKey));
@@ -192,7 +199,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 15,
     textAlign: 'center',
-    height: 20, // Prevents layout jump when text changes
+    height: 20, 
   },
 
   progressRow: {

@@ -1,3 +1,5 @@
+// C:\Users\user\Desktop\mpesa-crypto-bridge-frontend\src\store\walletSlice.tsx
+
 import {persistReducer} from 'redux-persist';
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -7,7 +9,8 @@ type WalletState = {
   privateKey: string | null;
   walletAddress: string | null;
   mnemonicPhrase: string | null;
-  token: string | null; // CRITICAL: Added this to store your Django Auth Token
+  authToken: string | null;    // CRITICAL: Renamed from token to match your UI screens
+  refreshToken: string | null; // NEW: Added to store your 7-day Django Refresh Token
 };
 
 const initialState: WalletState = {
@@ -15,16 +18,21 @@ const initialState: WalletState = {
   privateKey: null,
   walletAddress: null,
   mnemonicPhrase: null,
-  token: null, // Initialize as null
+  authToken: null,
+  refreshToken: null,
 };
 
 const walletSlice = createSlice({
   name: 'wallet',
   initialState,
   reducers: {
-    // UPDATED: Save the token during registration or login
+    // Save the short-lived access token
     setAuthToken: (state, action: PayloadAction<string>) => {
-      state.token = action.payload;
+      state.authToken = action.payload;
+    },
+    // Save the long-lived refresh token
+    setRefreshToken: (state, action: PayloadAction<string>) => {
+      state.refreshToken = action.payload;
     },
     setPrivateKey: (state, action: PayloadAction<string>) => {
       state.privateKey = action.payload;
@@ -42,7 +50,8 @@ const walletSlice = createSlice({
       state.privateKey = null;
       state.walletAddress = null;
       state.mnemonicPhrase = null;
-      state.token = null; // Clear token on logout
+      state.authToken = null;    // Clear access token on logout
+      state.refreshToken = null; // Clear refresh token on logout
       state.access = false;
     },
   },
@@ -54,7 +63,8 @@ const persistConfig = {
 };
 
 export const {
-  setAuthToken, // Export the new action
+  setAuthToken, 
+  setRefreshToken, // Export the new action
   resetWallet,
   setPrivateKey,
   setWalletAddress,
