@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import axios from 'axios';
+import LottieView from 'lottie-react-native'; // <-- Added Lottie import
 
 // Import your existing config and store
 import { URLS } from '@/src/config';
@@ -113,6 +114,18 @@ export default function SendScreen() {
             {renderHeader()}
             
             <View style={styles.contentContainer}>
+                
+                {/* --- LOTTIE ANIMATION --- */}
+                <View style={styles.animationContainer}>
+                    <LottieView
+                        // Adjust the path below if your alias setup differs
+                        source={require('@/assets/animations/Remix_of_crypto_wallet_transaction_animation.json')}
+                        autoPlay
+                        loop
+                        style={styles.lottie}
+                    />
+                </View>
+
                 {/* Search Bar */}
                 <View style={styles.searchContainer}>
                     <Ionicons name="search" size={20} color={COLORS.textSecondary} />
@@ -208,6 +221,17 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 24,
         paddingTop: 10,
+    },
+
+    // --- Added Lottie Styles ---
+    animationContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+    },
+    lottie: {
+        width: 150,
+        height: 150,
     },
 
     searchContainer: {

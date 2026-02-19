@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { Provider } from 'react-redux';
@@ -7,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import FlashMessage from 'react-native-flash-message';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import LottieView from 'lottie-react-native';
 
 import { store, persistor } from '@/src/store';
 
@@ -14,6 +16,9 @@ import { store, persistor } from '@/src/store';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  // 1. Add state to track when the Lottie animation completes
+  const [animationFinished, setAnimationFinished] = useState(false);
+  
   const [loaded, error] = useFonts({
     'SourceSans3-Regular': require('../assets/fonts/SourceSans3-Regular.ttf'),
     'SourceSans3-Medium': require('../assets/fonts/SourceSans3-Medium.ttf'),
@@ -24,16 +29,29 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
-  if (!loaded) {
-    return null;
+  // 2. Show the Lottie View if fonts are loading OR the animation is still playing
+  if (!loaded || !animationFinished) {
+    return (
+      <View style={styles.splashContainer}>
+        <LottieView
+          source={require('../assets/animations/biti.json')}
+          autoPlay
+          loop={false}
+          onAnimationFinish={() => {
+            // Signal that the animation is done
+            setAnimationFinished(true);
+          }}
+          onLayout={async () => {
+            // 3. Hide the static native splash screen as soon as Lottie is ready to render
+            await SplashScreen.hideAsync();
+          }}
+          style={styles.lottie}
+        />
+      </View>
+    );
   }
 
+  // 4. Once fonts are loaded AND the animation is done, render the actual app
   return (
     <SafeAreaProvider>
       <Provider store={store}>
@@ -76,3 +94,17 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+// 5. Add styles for the splash screen container
+const styles = StyleSheet.create({
+  splashContainer: {
+    flex: 1,
+    backgroundColor: '#111111', // Matches your app.json splash background color
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lottie: {
+    width: 250, 
+    height: 250,
+  },
+});
