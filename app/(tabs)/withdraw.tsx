@@ -6,16 +6,17 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   ActivityIndicator, 
-  Alert, 
   ScrollView, 
   KeyboardAvoidingView, 
   Platform,
-  StatusBar
+  StatusBar,
+  Modal
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import axios from 'axios';
 import { showMessage } from 'react-native-flash-message';
 
@@ -38,11 +39,12 @@ const COLORS = {
 export default function WithdrawScreen() {
   const router = useRouter();
   
-  const { privateKey } = useAppSelector((state) => state.walletReducer);
+  const { privateKey } = useAppSelector((state: any) => state.walletReducer);
   
   const [amount, setAmount] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(''); 
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Normalize phone to 254...
   const formatPhoneNumber = (phone: string) => {
@@ -79,14 +81,8 @@ export default function WithdrawScreen() {
       console.log("✅ Withdraw Success:", response.data);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      Alert.alert(
-        "Withdrawal Successful!",
-        `Funds sent to ${normalizedPhone}. Check your M-Pesa SMS.`,
-        [
-          { text: "OK", onPress: () => router.push('/(tabs)/home') }
-        ]
-      );
-      setAmount('');
+      // Trigger the custom frosted glass modal instead of Alert
+      setShowSuccessModal(true);
 
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -96,6 +92,12 @@ export default function WithdrawScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleModalClose = () => {
+    setShowSuccessModal(false);
+    setAmount('');
+    router.push('/(tabs)/home');
   };
 
   const renderHeader = () => (
@@ -109,6 +111,31 @@ export default function WithdrawScreen() {
       <Text style={styles.headerTitle}>Withdraw Cash</Text>
       <View style={{ width: 40 }} /> 
     </View>
+  );
+
+  const renderSuccessModal = () => (
+    <Modal visible={showSuccessModal} transparent animationType="fade">
+      <BlurView intensity={60} tint="dark" style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalIconContainer}>
+            <Ionicons name="checkmark-circle" size={48} color={COLORS.primary} />
+          </View>
+          
+          <Text style={styles.modalTitle}>Withdrawal Initiated!</Text>
+          <Text style={styles.modalText}>
+            Your funds are on the way to M-Pesa. Check the SMS for {formatPhoneNumber(phoneNumber)} shortly.
+          </Text>
+
+          <TouchableOpacity 
+            style={styles.modalButton} 
+            onPress={handleModalClose}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.modalButtonText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
+    </Modal>
   );
 
   return (
@@ -213,6 +240,10 @@ export default function WithdrawScreen() {
 
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Mount the custom modal */}
+      {renderSuccessModal()}
+      
     </SafeAreaView>
   );
 }
@@ -248,7 +279,7 @@ const styles = StyleSheet.create({
   // Info Card
   infoCard: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)', // Tinted Orange/Warning
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
     padding: 16,
     borderRadius: 20,
     marginBottom: 32,
@@ -372,5 +403,62 @@ const styles = StyleSheet.create({
   footer: {
       marginTop: 20,
       paddingBottom: 20
-  }
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+  },
+  modalCard: {
+    width: '85%',
+    backgroundColor: COLORS.surface,
+    borderRadius: 32,
+    padding: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(0, 208, 156, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    color: COLORS.textPrimary,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  modalButton: {
+    backgroundColor: COLORS.primary,
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#00332a',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });

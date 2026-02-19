@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
-// Constants matching your previous premium theme
 const COLORS = {
   background: '#0F1115',
   primary: '#00D09C',    // Mint Green
@@ -16,9 +15,9 @@ const COLORS = {
 
 const { width } = Dimensions.get('window');
 
-/**
- * Custom Floating Tab Bar Component
- */
+// 🛑 THE FIX: We explicitly define ONLY the tabs we want to show on the bar.
+const VISIBLE_TABS = ['home', 'switchers', 'history', 'profile'];
+
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
 
@@ -34,6 +33,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
 
+            // 🛑 THE FIX: If the route is NOT in our allowed list, completely skip it!
+            if (!VISIBLE_TABS.includes(route.name)) {
+              return null;
+            }
+
             const onPress = () => {
               const event = navigation.emit({
                 type: 'tabPress',
@@ -42,17 +46,15 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               });
 
               if (!isFocused && !event.defaultPrevented) {
-                // Haptic Feedback for premium feel
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 navigation.navigate(route.name);
               }
             };
 
-            // Map route names to Ionicons
             let iconName: keyof typeof Ionicons.glyphMap = 'home';
             if (route.name === 'home') iconName = isFocused ? 'home' : 'home-outline';
             if (route.name === 'switchers') iconName = isFocused ? 'swap-horizontal' : 'swap-horizontal-outline';
-            if (route.name === 'tokens') iconName = isFocused ? 'wallet' : 'wallet-outline';
+            if (route.name === 'history') iconName = isFocused ? 'receipt' : 'receipt-outline';
             if (route.name === 'profile') iconName = isFocused ? 'person' : 'person-outline';
 
             return (
@@ -60,8 +62,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 key={index}
                 accessibilityRole="button"
                 accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={options.tabBarAccessibilityLabel}
-                testID={options.tabBarTestID}
                 onPress={onPress}
                 style={styles.tabItem}
                 activeOpacity={0.7}
@@ -93,35 +93,26 @@ export default function RootLayout() {
         tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          // Hide standard tab bar since we use a custom one
           tabBarStyle: { display: 'none' }, 
         }}
-        // Ensure content isn't hidden behind the floating bar
         sceneContainerStyle={{ backgroundColor: COLORS.background }}
       >
-        <Tabs.Screen
-          name="home"
-          options={{ title: 'Home' }}
-        />
-        <Tabs.Screen
-          name="switchers"
-          options={{ title: 'Swap' }}
-        />
-        <Tabs.Screen
-          name="tokens"
-          options={{ title: 'Assets' }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{ title: 'Profile' }}
-        />
+        {/* Visible Tabs */}
+        <Tabs.Screen name="home" options={{ title: 'Home' }} />
+        <Tabs.Screen name="switchers" options={{ title: 'Swap' }} />
+        <Tabs.Screen name="history" options={{ title: 'History' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+
+        {/* Hidden Tabs */}
+        <Tabs.Screen name="deposit" options={{ href: null }} />
+        <Tabs.Screen name="send" options={{ href: null }} />
+        <Tabs.Screen name="withdraw" options={{ href: null }} />
       </Tabs>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  // Container that positions the floating bar at the bottom
   tabBarContainer: {
     position: 'absolute',
     bottom: 0,
@@ -130,18 +121,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'transparent',
   },
-  // The Glass Pill
   blurContainer: {
-    width: width * 0.9,       // 90% of screen width
-    borderRadius: 35,         // High rounded corners
-    overflow: 'hidden',       // Clips the blur to the radius
+    width: width * 0.9,       
+    borderRadius: 35,         
+    overflow: 'hidden',       
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)', // Subtle glass border
-    backgroundColor: Platform.OS === 'android' ? COLORS.tabBarBg : 'transparent', // Android fallback
+    borderColor: 'rgba(255,255,255,0.1)', 
+    backgroundColor: Platform.OS === 'android' ? COLORS.tabBarBg : 'transparent',
   },
   tabBarContent: {
     flexDirection: 'row',
-    height: 70,               // Taller tappable area
+    height: 70,               
     alignItems: 'center',
     justifyContent: 'space-around',
   },
@@ -157,9 +147,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
   },
-  // Subtle glow/bg for active state (optional, keeps it clean)
   activeIconContainer: {
-    // backgroundColor: 'rgba(0, 208, 156, 0.1)', // Optional: enable for a "button" look
     borderRadius: 20,
   },
   activeDot: {

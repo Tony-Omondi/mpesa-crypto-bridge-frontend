@@ -17,18 +17,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import axios from 'axios';
 
-// Keep your existing imports
 import { theme } from '@/src/constants';
 import { URLS } from '@/src/config';
 import { useAppSelector } from '@/src/store';
 
 const { width } = Dimensions.get('window');
 
-// Local constants for premium UI feel if not in your theme
 const COLORS = {
-  background: '#0F1115', // Deep dark background
-  cardBg: theme.colors.primary || '#00D09C', // Your primary or a mint green
-  cardText: '#00332a', // Dark text for contrast on bright card
+  background: '#0F1115',
+  cardBg: theme.colors.primary || '#00D09C',
+  cardText: '#00332a',
   textPrimary: '#FFFFFF',
   textSecondary: '#94A3B8',
   surface: '#1E293B',
@@ -92,6 +90,37 @@ export default function Home() {
     router.push(route);
   };
 
+  // Helper to determine UI based on transaction type
+  const getTxUI = (item: any, currentWallet: string) => {
+    const isDeposit = item.type === "DEPOSIT";
+    const isSent = item.from_address?.toLowerCase() === currentWallet?.toLowerCase();
+
+    if (isDeposit) {
+      return {
+        title: "M-Pesa Deposit",
+        icon: "arrow-down-outline",
+        color: COLORS.success,
+        prefix: "+"
+      };
+    }
+    
+    if (isSent) {
+      return {
+        title: "Sent NIT",
+        icon: "arrow-up-outline",
+        color: COLORS.error,
+        prefix: "-"
+      };
+    }
+    
+    return {
+      title: "Received NIT",
+      icon: "arrow-down-outline",
+      color: COLORS.success,
+      prefix: "+"
+    };
+  };
+
   // --- RENDER COMPONENTS ---
 
   const renderHeader = () => (
@@ -102,7 +131,6 @@ export default function Home() {
           style={styles.addressPill} 
           onPress={() => {
             Haptics.selectionAsync();
-            // Add clipboard logic here if you want
           }}
         >
           <Ionicons name="wallet-outline" size={14} color={COLORS.textSecondary} />
@@ -127,7 +155,6 @@ export default function Home() {
   const renderBalanceCard = () => (
     <View style={styles.cardContainer}>
       <View style={styles.card}>
-        {/* Decorative Background Circles */}
         <View style={[styles.decorCircle, { top: -50, right: -50 }]} />
         <View style={[styles.decorCircle, { bottom: -80, left: -20, opacity: 0.1 }]} />
 
@@ -210,30 +237,34 @@ export default function Home() {
         </View>
       ) : (
         history.map((item: any, index: number) => {
-            const isCompleted = item.status === 'COMPLETED';
-            return (
-              <View key={index} style={styles.historyItem}>
-                <View style={[styles.historyIcon, { backgroundColor: isCompleted ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)' }]}>
-                  <Ionicons 
-                    name={isCompleted ? "arrow-down-outline" : "time-outline"} 
-                    size={20} 
-                    color={isCompleted ? COLORS.success : COLORS.warning} 
-                  />
-                </View>
-                <View style={styles.historyContent}>
-                  <Text style={styles.historyTitle}>M-Pesa Deposit</Text>
-                  <Text style={styles.historyDate}>
-                    {new Date(item.created_at).toLocaleDateString()} • {item.status}
-                  </Text>
-                </View>
-                <Text style={[
-                  styles.historyAmount, 
-                  { color: isCompleted ? COLORS.success : COLORS.textSecondary }
-                ]}>
-                  +{item.amount_kes || item.amount} NIT
+          const ui = getTxUI(item, walletAddress);
+          const isPending = item.status === 'PENDING' || item.status === 'PAID_BUT_FAILED';
+          
+          return (
+            <View key={item.id ? `${item.type}-${item.id}` : index} style={styles.historyItem}>
+              <View style={[styles.historyIcon, { backgroundColor: `${ui.color}15` }]}>
+                <Ionicons 
+                  name={isPending ? "time-outline" : ui.icon as any} 
+                  size={20} 
+                  color={isPending ? COLORS.warning : ui.color} 
+                />
+              </View>
+              
+              <View style={styles.historyContent}>
+                <Text style={styles.historyTitle}>{ui.title}</Text>
+                <Text style={styles.historyDate}>
+                  {new Date(item.created_at).toLocaleDateString()} • {item.status}
                 </Text>
               </View>
-            );
+              
+              <Text style={[
+                styles.historyAmount, 
+                { color: ui.prefix === '+' ? COLORS.success : COLORS.textPrimary }
+              ]}>
+                {ui.prefix}{item.amount} NIT
+              </Text>
+            </View>
+          );
         })
       )}
     </View>
@@ -275,8 +306,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -321,8 +350,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
   },
-
-  // Card
   cardContainer: {
     paddingHorizontal: 24,
     marginTop: 20,
@@ -433,8 +460,6 @@ const styles = StyleSheet.create({
     color: COLORS.cardText,
     opacity: 0.9,
   },
-
-  // Actions
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -457,8 +482,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-
-  // History
   historySection: {
     paddingHorizontal: 24,
   },
