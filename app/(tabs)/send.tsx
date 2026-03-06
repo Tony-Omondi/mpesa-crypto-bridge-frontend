@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import axios from 'axios';
-import LottieView from 'lottie-react-native'; // <-- Added Lottie import
+import LottieView from 'lottie-react-native';
 
 // Import your existing config and store
 import { URLS } from '@/src/config';
@@ -118,10 +118,10 @@ export default function SendScreen() {
                 {/* --- LOTTIE ANIMATION --- */}
                 <View style={styles.animationContainer}>
                     <LottieView
-                        // Adjust the path below if your alias setup differs
                         source={require('@/assets/animations/Remix_of_crypto_wallet_transaction_animation.json')}
                         autoPlay
                         loop
+                        renderMode="HARDWARE" // <-- Added to prevent Android lag
                         style={styles.lottie}
                     />
                 </View>
@@ -223,7 +223,6 @@ const styles = StyleSheet.create({
         paddingTop: 10,
     },
 
-    // --- Added Lottie Styles ---
     animationContainer: {
         alignItems: 'center',
         justifyContent: 'center',

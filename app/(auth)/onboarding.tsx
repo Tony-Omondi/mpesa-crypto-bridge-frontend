@@ -10,12 +10,11 @@ import {
   Text,
   Platform,
 } from 'react-native';
-import {Image} from 'expo-image';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {Ionicons} from '@expo/vector-icons';
+import LottieView from 'lottie-react-native'; // 🛑 IMPORTED LOTTIE
 
-import {theme} from '@/src/constants';
 import {useAppSelector} from '@/src/store';
 
 const { width, height } = Dimensions.get('window');
@@ -29,24 +28,25 @@ const COLORS = {
   surface: '#1E293B',
 };
 
+// 🛑 UPDATED DATA ARRAY WITH LOTTIE ANIMATIONS
 const onboardingData = [
   {
     id: 1,
-    image: require('../../assets/images/01.png'),
+    animation: require('../../assets/animations/sendmoney.json'),
     titleLine1: 'Instant Crypto via',
     titleLine2: 'M-Pesa!',
     description: 'Buy NiTokens ($NIT) directly using your M-Pesa balance. Safe, fast, and no credit cards required.',
   },
   {
     id: 2,
-    image: require('../../assets/images/02.png'),
+    animation: require('../../assets/animations/conversion.json'), // Reusing conversion here, swap if you have a 3rd!
     titleLine1: '1 KES = 1 NIT',
     titleLine2: 'Stable & Secure',
     description: 'Your digital shilling. Pegged 1:1 to KES. Protect your savings from market volatility.',
   },
   {
     id: 3,
-    image: require('../../assets/images/03.png'),
+    animation: require('../../assets/animations/sendmoney.json'),
     titleLine1: 'Send Money,',
     titleLine2: 'Not Fees',
     description: 'Transfer value instantly to anyone on the network. Cash out to M-Pesa anytime, anywhere.',
@@ -87,7 +87,7 @@ export default function Onboarding() {
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
-      {/* Image Carousel */}
+      {/* Animation Carousel */}
       <View style={styles.carouselSection}>
         <ScrollView
           horizontal
@@ -98,10 +98,13 @@ export default function Onboarding() {
         >
           {onboardingData.map((item) => (
             <View key={item.id} style={styles.slide}>
-              <Image
-                source={item.image}
-                contentFit="contain"
-                style={styles.image}
+              {/* 🛑 SWAPPED STATIC IMAGE FOR LOTTIEVIEW */}
+              <LottieView
+                source={item.animation}
+                autoPlay
+                loop
+                resizeMode="contain"
+                style={styles.animation}
               />
             </View>
           ))}
@@ -184,9 +187,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  image: {
-    width: width * 0.85,
-    height: '100%',
+  // 🛑 RENAMED FROM 'image' TO 'animation'
+  animation: {
+    width: width * 0.9,
+    height: width * 0.9, // Keeps it a perfect square so animations don't stretch
   },
   detailsSection: {
     flex: 1,

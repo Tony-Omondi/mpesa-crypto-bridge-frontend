@@ -6,14 +6,21 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   StatusBar,
-  Platform 
+  Platform,
+  ActivityIndicator,
+  Modal
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as LocalAuthentication from 'expo-local-authentication'; 
+import { BlurView } from 'expo-blur'; 
+import axios from 'axios';
+import LottieView from 'lottie-react-native'; 
 
+import { URLS } from '@/src/config';
 import { useAppSelector } from '@/src/store';
 import { getTokenById } from '@/src/utils/getTokenById';
 
@@ -26,22 +33,31 @@ const COLORS = {
   surface: '#1E293B',
   border: '#334155',
   line: 'rgba(255,255,255,0.1)',
+  error: '#EF4444',
 };
 
 export default function ConfirmTransaction() {
   const router = useRouter();
   const { id, recipient, amount } = useLocalSearchParams();
   const token = getTokenById(String(id));
-  const { walletAddress, access } = useAppSelector((state) => state.walletReducer);
+  const tokenSymbol = token?.symbol || 'NIT'; 
+  
+  const { walletAddress, privateKey, access } = useAppSelector((state: any) => state.walletReducer);
 
-  // Formatting helpers
+  const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
+  // --- NEW ERROR STATES ---
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const formatAddress = (addr: string) => {
     if (!addr) return '...';
     if (addr.length < 10) return addr;
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
   };
 
-  const estimatedGas = "0.0004 ETH"; // Mock gas fee for realism
+  const estimatedGas = "0.0004 ETH"; 
 
   useEffect(() => {
     if (!access) {
@@ -49,12 +65,65 @@ export default function ConfirmTransaction() {
     }
   }, [access]);
 
-  const handleConfirm = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.push({
-      pathname: '/(loading)/transfer',
-      params: { id, recipient, amount },
-    });
+  const handleConfirm = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const authResult = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Authenticate to send ${amount} ${tokenSymbol}`,
+        fallbackLabel: 'Use Passcode',
+        disableDeviceFallback: false,
+      });
+
+      if (!authResult.success) {
+        throw new Error("Authentication cancelled.");
+      }
+
+      setLoading(true);
+      console.log(`🚀 Sending ${amount} ${tokenSymbol} to ${recipient}...`);
+
+      const response = await axios.post(URLS.TRANSFER_NIT, {
+        to_address: recipient,
+        amount: amount,
+        privateKey: privateKey, 
+      });
+
+      console.log("✅ Transfer Success:", response.data);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowSuccessModal(true);
+
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.error("❌ Send Error:", error.response?.data || error.message);
+      
+      // Smart error extraction for better user feedback
+      let extractedError = "Transaction failed. Please check your connection and try again.";
+      const rawError = error.response?.data?.error || error.response?.data?.privateKey?.[0] || error.message;
+
+      // Make blockchain errors readable
+      if (rawError.toLowerCase().includes('insufficient funds')) {
+          extractedError = `You do not have enough ${tokenSymbol} (or gas) to complete this transaction.`;
+      } else if (rawError.toLowerCase().includes('authentication')) {
+          extractedError = "Authentication was cancelled or failed.";
+      } else if (rawError) {
+          extractedError = rawError; // Fallback to whatever the backend sent
+      }
+        
+      setErrorMessage(extractedError);
+      setShowErrorModal(true); // Trigger the error modal instead of flash message
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleModalClose = (isSuccess: boolean) => {
+    if (isSuccess) {
+        setShowSuccessModal(false);
+        router.push('/(tabs)/home'); 
+    } else {
+        setShowErrorModal(false);
+    }
   };
 
   const renderHeader = () => (
@@ -62,6 +131,7 @@ export default function ConfirmTransaction() {
       <TouchableOpacity 
         onPress={() => router.back()} 
         style={styles.backButton}
+        disabled={loading}
       >
         <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
       </TouchableOpacity>
@@ -70,38 +140,89 @@ export default function ConfirmTransaction() {
     </View>
   );
 
+  const renderSuccessModal = () => (
+    <Modal visible={showSuccessModal} transparent animationType="fade">
+      <BlurView intensity={60} tint="dark" style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <View style={styles.modalIconContainer}>
+            <LottieView
+              source={require('@/assets/animations/sent.json')}
+              autoPlay
+              loop={false} 
+              style={{ width: 100, height: 100 }}
+            />
+          </View>
+          <Text style={styles.modalTitle}>Tokens Sent!</Text>
+          <Text style={styles.modalText}>
+            You successfully sent {amount} {tokenSymbol} to {formatAddress(String(recipient))}.
+          </Text>
+          <TouchableOpacity style={styles.modalButton} onPress={() => handleModalClose(true)} activeOpacity={0.8}>
+            <Text style={styles.modalButtonText}>Back to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
+    </Modal>
+  );
+
+  // --- NEW ERROR MODAL COMPONENT ---
+  const renderErrorModal = () => (
+    <Modal visible={showErrorModal} transparent animationType="fade">
+      <BlurView intensity={60} tint="dark" style={styles.modalOverlay}>
+        <View style={[styles.modalCard, { borderColor: COLORS.error }]}>
+          <View style={styles.modalIconContainer}>
+            <LottieView
+              source={require('@/assets/animations/failed.json')}
+              autoPlay
+              loop={false} 
+              style={{ width: 100, height: 100 }}
+            />
+          </View>
+          <Text style={[styles.modalTitle, { color: COLORS.error }]}>Transfer Failed</Text>
+          <Text style={styles.modalText}>
+            {errorMessage}
+          </Text>
+          <TouchableOpacity 
+             style={[styles.modalButton, { backgroundColor: COLORS.error }]} 
+             onPress={() => handleModalClose(false)} 
+             activeOpacity={0.8}
+          >
+            <Text style={[styles.modalButtonText, { color: '#FFF' }]}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
+    </Modal>
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.background} />
       {renderHeader()}
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
         {/* RECEIPT CARD */}
         <View style={styles.receiptCard}>
             
-            {/* Header: Amount & Token */}
             <View style={styles.amountSection}>
-                <View style={styles.iconCircle}>
-                    {token?.logo ? (
-                         <Image source={{ uri: token.logo }} style={styles.tokenImage} />
-                    ) : (
-                         <Ionicons name="cube" size={24} color={COLORS.primary} />
-                    )}
-                </View>
+                <LottieView
+                  source={require('@/assets/animations/sendinganimation.json')}
+                  autoPlay
+                  loop
+                  style={{ width: 100, height: 100, marginBottom: -10 }}
+                />
+
                 <Text style={styles.sendingLabel}>Sending</Text>
-                <Text style={styles.amountText}>
-                    {amount} <Text style={styles.symbolText}>{token?.symbol}</Text>
-                </Text>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={styles.amountText}>{amount}</Text>
+                    {token?.logo && <Image source={{ uri: token.logo }} style={styles.smallTokenImage} />}
+                    <Text style={styles.symbolText}>{tokenSymbol}</Text>
+                </View>
             </View>
 
-            {/* Dotted Divider */}
             <View style={styles.divider} />
 
-            {/* Details */}
             <View style={styles.detailsSection}>
-                
-                {/* FROM */}
                 <View style={styles.row}>
                     <Text style={styles.rowLabel}>From</Text>
                     <View style={styles.addressPill}>
@@ -110,7 +231,6 @@ export default function ConfirmTransaction() {
                     </View>
                 </View>
 
-                {/* TO */}
                 <View style={styles.row}>
                     <Text style={styles.rowLabel}>To</Text>
                     <View style={styles.addressPill}>
@@ -119,29 +239,24 @@ export default function ConfirmTransaction() {
                     </View>
                 </View>
 
-                {/* NETWORK FEE */}
                 <View style={styles.row}>
                     <Text style={styles.rowLabel}>Network Fee</Text>
                     <Text style={styles.feeText}>{estimatedGas}</Text>
                 </View>
-
             </View>
 
-            {/* Total Divider */}
             <View style={styles.divider} />
 
-            {/* Total */}
             <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Total</Text>
                 <View style={{alignItems: 'flex-end'}}>
-                    <Text style={styles.totalAmount}>{amount} {token?.symbol}</Text>
+                    <Text style={styles.totalAmount}>{amount} {tokenSymbol}</Text>
                     <Text style={styles.totalFee}>+ {estimatedGas} fee</Text>
                 </View>
             </View>
 
         </View>
 
-        {/* Security Note */}
         <View style={styles.securityNote}>
             <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.primary} />
             <Text style={styles.securityText}>Transaction is secure and irreversible.</Text>
@@ -151,11 +266,25 @@ export default function ConfirmTransaction() {
 
       {/* CONFIRM BUTTON */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm}>
-            <Ionicons name="finger-print" size={24} color="#00332a" style={{marginRight: 8}} />
-            <Text style={styles.buttonText}>Confirm & Send</Text>
+        <TouchableOpacity 
+          style={[styles.confirmButton, loading && { opacity: 0.7 }]} 
+          onPress={handleConfirm}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <>
+              <Ionicons name="finger-print" size={24} color="#00332a" style={{marginRight: 8}} />
+              <Text style={styles.buttonText}>Authenticate & Send</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
+
+      {/* Render Modals */}
+      {renderSuccessModal()}
+      {renderErrorModal()}
 
     </SafeAreaView>
   );
@@ -205,20 +334,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  tokenImage: {
-    width: 32,
-    height: 32,
+  smallTokenImage: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   sendingLabel: {
     color: COLORS.textSecondary,
@@ -227,6 +346,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 1,
+    zIndex: 10, 
   },
   amountText: {
     color: COLORS.textPrimary,
@@ -242,7 +362,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: COLORS.line,
     marginVertical: 16,
-    borderStyle: 'dashed', // Note: borderStyle only works with borderWidth on View in some RN versions, simply using low opacity line here is safer
   },
 
   detailsSection: {
@@ -322,7 +441,7 @@ const styles = StyleSheet.create({
     right: 0,
     padding: 24,
     paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    backgroundColor: COLORS.background, // Opaque bg to cover scroll content
+    backgroundColor: COLORS.background, 
   },
   confirmButton: {
     backgroundColor: COLORS.primary,
@@ -342,4 +461,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)'
+  },
+  modalCard: {
+    width: '85%', backgroundColor: COLORS.surface, borderRadius: 32, padding: 32,
+    alignItems: 'center', borderWidth: 1, borderColor: COLORS.border,
+  },
+  modalIconContainer: {
+    width: 80, height: 80, borderRadius: 40, backgroundColor: 'transparent',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+  },
+  modalTitle: { color: COLORS.textPrimary, fontSize: 22, fontWeight: '800', marginBottom: 12 },
+  modalText: { color: COLORS.textSecondary, fontSize: 15, textAlign: 'center', marginBottom: 32, lineHeight: 22 },
+  modalButton: { backgroundColor: COLORS.primary, width: '100%', paddingVertical: 16, borderRadius: 16, alignItems: 'center' },
+  modalButtonText: { color: '#00332a', fontSize: 16, fontWeight: '700' },
 });

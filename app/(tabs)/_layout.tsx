@@ -6,6 +6,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 
+// 🛑 1. IMPORT YOUR NEW SECURITY LOCK
+import GlobalAppLock from '@/src/components/GlobalAppLock';
+
 const COLORS = {
   background: '#0F1115',
   primary: '#00D09C',    // Mint Green
@@ -15,7 +18,7 @@ const COLORS = {
 
 const { width } = Dimensions.get('window');
 
-// 🛑 THE FIX: We explicitly define ONLY the tabs we want to show on the bar.
+// 🛑 We explicitly define ONLY the tabs we want to show on the bar.
 const VISIBLE_TABS = ['home', 'switchers', 'history', 'profile'];
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
@@ -33,7 +36,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             const { options } = descriptors[route.key];
             const isFocused = state.index === index;
 
-            // 🛑 THE FIX: If the route is NOT in our allowed list, completely skip it!
+            // 🛑 If the route is NOT in our allowed list, completely skip it!
             if (!VISIBLE_TABS.includes(route.name)) {
               return null;
             }
@@ -88,27 +91,30 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
 export default function RootLayout() {
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <Tabs
-        tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: { display: 'none' }, 
-        }}
-        sceneContainerStyle={{ backgroundColor: COLORS.background }}
-      >
-        {/* Visible Tabs */}
-        <Tabs.Screen name="home" options={{ title: 'Home' }} />
-        <Tabs.Screen name="switchers" options={{ title: 'Swap' }} />
-        <Tabs.Screen name="history" options={{ title: 'History' }} />
-        <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+    // 🛑 2. WRAP THE ENTIRE TAB SYSTEM IN THE GLOBAL LOCK
+    <GlobalAppLock>
+      <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+        <Tabs
+          tabBar={(props) => <CustomTabBar {...props} />}
+          screenOptions={{
+            headerShown: false,
+            tabBarStyle: { display: 'none' }, 
+          }}
+          sceneContainerStyle={{ backgroundColor: COLORS.background }}
+        >
+          {/* Visible Tabs */}
+          <Tabs.Screen name="home" options={{ title: 'Home' }} />
+          <Tabs.Screen name="switchers" options={{ title: 'Swap' }} />
+          <Tabs.Screen name="history" options={{ title: 'History' }} />
+          <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
 
-        {/* Hidden Tabs */}
-        <Tabs.Screen name="deposit" options={{ href: null }} />
-        <Tabs.Screen name="send" options={{ href: null }} />
-        <Tabs.Screen name="withdraw" options={{ href: null }} />
-      </Tabs>
-    </View>
+          {/* Hidden Tabs */}
+          <Tabs.Screen name="deposit" options={{ href: null }} />
+          <Tabs.Screen name="send" options={{ href: null }} />
+          <Tabs.Screen name="withdraw" options={{ href: null }} />
+        </Tabs>
+      </View>
+    </GlobalAppLock>
   );
 }
 

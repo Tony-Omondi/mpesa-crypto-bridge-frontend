@@ -19,6 +19,8 @@ import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import axios from 'axios';
 import { showMessage } from 'react-native-flash-message';
+import * as LocalAuthentication from 'expo-local-authentication'; 
+import LottieView from 'lottie-react-native'; // <-- IMPORTED LOTTIE
 
 import { URLS } from '@/src/config';
 import { useAppSelector } from '@/src/store';
@@ -44,7 +46,11 @@ export default function WithdrawScreen() {
   const [amount, setAmount] = useState('');
   const [phoneNumber, setPhoneNumber] = useState(''); 
   const [loading, setLoading] = useState(false);
+  
+  // --- MODAL STATES ---
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Normalize phone to 254...
   const formatPhoneNumber = (phone: string) => {
@@ -70,6 +76,16 @@ export default function WithdrawScreen() {
     const normalizedPhone = formatPhoneNumber(phoneNumber);
 
     try {
+      const authResult = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Verify identity to withdraw KES',
+        fallbackLabel: 'Use Passcode',
+        disableDeviceFallback: false,
+      });
+
+      if (!authResult.success) {
+        throw new Error("Authentication cancelled.");
+      }
+
       console.log("💸 Initiating Withdrawal...");
 
       const response = await axios.post(URLS.WITHDRAW_NIT, {
@@ -81,23 +97,40 @@ export default function WithdrawScreen() {
       console.log("✅ Withdraw Success:", response.data);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Trigger the custom frosted glass modal instead of Alert
       setShowSuccessModal(true);
 
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       console.error("❌ Withdraw Error:", error.response?.data || error.message);
-      const errorMsg = error.response?.data?.error || "Withdrawal failed. Check your connection.";
-      showMessage({ message: "Failed", description: errorMsg, type: "danger" });
+      
+      // Smart error extraction 
+      let extractedError = "Withdrawal failed. Please check your connection and try again.";
+      const rawError = error.response?.data?.error || error.message;
+
+      if (rawError.toLowerCase().includes('insufficient')) {
+          extractedError = "You do not have enough $NIT tokens to complete this withdrawal.";
+      } else if (rawError.toLowerCase().includes('authentication')) {
+          extractedError = "Authentication was cancelled or failed.";
+      } else if (rawError) {
+          extractedError = rawError; 
+      }
+
+      setErrorMessage(extractedError);
+      setShowErrorModal(true); // Trigger the error modal
+
     } finally {
       setLoading(false);
     }
   };
 
-  const handleModalClose = () => {
-    setShowSuccessModal(false);
-    setAmount('');
-    router.push('/(tabs)/home');
+  const handleModalClose = (isSuccess: boolean) => {
+    if (isSuccess) {
+        setShowSuccessModal(false);
+        setAmount('');
+        router.push('/(tabs)/home');
+    } else {
+        setShowErrorModal(false);
+    }
   };
 
   const renderHeader = () => (
@@ -118,7 +151,13 @@ export default function WithdrawScreen() {
       <BlurView intensity={60} tint="dark" style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalIconContainer}>
-            <Ionicons name="checkmark-circle" size={48} color={COLORS.primary} />
+            {/* 🌟 LOTTIE SUCCESS ANIMATION 🌟 */}
+            <LottieView
+              source={require('@/assets/animations/withdrewed.json')}
+              autoPlay
+              loop={true} 
+              style={{ width: 100, height: 100 }}
+            />
           </View>
           
           <Text style={styles.modalTitle}>Withdrawal Initiated!</Text>
@@ -128,10 +167,41 @@ export default function WithdrawScreen() {
 
           <TouchableOpacity 
             style={styles.modalButton} 
-            onPress={handleModalClose}
+            onPress={() => handleModalClose(true)}
             activeOpacity={0.8}
           >
             <Text style={styles.modalButtonText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      </BlurView>
+    </Modal>
+  );
+
+  const renderErrorModal = () => (
+    <Modal visible={showErrorModal} transparent animationType="fade">
+      <BlurView intensity={60} tint="dark" style={styles.modalOverlay}>
+        <View style={[styles.modalCard, { borderColor: COLORS.error }]}>
+          <View style={styles.modalIconContainer}>
+            {/* 🌟 LOTTIE FAILED ANIMATION 🌟 */}
+            <LottieView
+              source={require('@/assets/animations/failed.json')}
+              autoPlay
+              loop={false} 
+              style={{ width: 100, height: 100 }}
+            />
+          </View>
+          
+          <Text style={[styles.modalTitle, { color: COLORS.error }]}>Withdrawal Failed</Text>
+          <Text style={styles.modalText}>
+            {errorMessage}
+          </Text>
+
+          <TouchableOpacity 
+            style={[styles.modalButton, { backgroundColor: COLORS.error }]} 
+            onPress={() => handleModalClose(false)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.modalButtonText, { color: '#FFF' }]}>Try Again</Text>
           </TouchableOpacity>
         </View>
       </BlurView>
@@ -241,8 +311,9 @@ export default function WithdrawScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Mount the custom modal */}
+      {/* Mount both Modals */}
       {renderSuccessModal()}
+      {renderErrorModal()}
       
     </SafeAreaView>
   );
@@ -430,7 +501,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(0, 208, 156, 0.1)',
+    backgroundColor: 'transparent', // Updated to transparent for Lottie
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,

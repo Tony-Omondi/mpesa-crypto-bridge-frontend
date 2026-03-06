@@ -12,12 +12,16 @@ import LottieView from 'lottie-react-native';
 
 import { store, persistor } from '@/src/store';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
+// Prevent the native splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
+// 🛑 THE TRICK: This variable lives outside the component lifecycle. 
+// Once it flips to true, the splash screen can NEVER render again in this session.
+let hasPlayedOnce = false;
+
 export default function RootLayout() {
-  // 1. Add state to track when the Lottie animation completes
-  const [animationFinished, setAnimationFinished] = useState(false);
+  // Initialize state using the global variable
+  const [animationFinished, setAnimationFinished] = useState(hasPlayedOnce);
   
   const [loaded, error] = useFonts({
     'SourceSans3-Regular': require('../assets/fonts/SourceSans3-Regular.ttf'),
@@ -29,20 +33,22 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  // 2. Show the Lottie View if fonts are loading OR the animation is still playing
+  // Show the Lottie View only if fonts are loading OR the animation hasn't finished its first run
   if (!loaded || !animationFinished) {
     return (
       <View style={styles.splashContainer}>
         <LottieView
-          source={require('../assets/animations/biti.json')}
-          autoPlay
+          source={require('../assets/animations/miuntlynewsplash.json')}
+          autoPlay={true}
           loop={false}
+          resizeMode="cover" // Stretches the animation to fill the screen
           onAnimationFinish={() => {
-            // Signal that the animation is done
+            // Permanently lock out the splash screen for this app session
+            hasPlayedOnce = true; 
             setAnimationFinished(true);
           }}
           onLayout={async () => {
-            // 3. Hide the static native splash screen as soon as Lottie is ready to render
+            // Hide the static native splash screen as soon as Lottie is ready to render
             await SplashScreen.hideAsync();
           }}
           style={styles.lottie}
@@ -51,7 +57,7 @@ export default function RootLayout() {
     );
   }
 
-  // 4. Once fonts are loaded AND the animation is done, render the actual app
+  // Once fonts are loaded AND the animation is done, render the actual app
   return (
     <SafeAreaProvider>
       <Provider store={store}>
@@ -61,9 +67,8 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerShown: false,
-              // Swapping eigengrau for the new premium deep dark background
               contentStyle: { flex: 1, backgroundColor: '#0F1115' },
-              animation: 'fade_from_bottom', // Smoother transition for fintech feel
+              animation: 'fade_from_bottom', 
             }}
           >
             {/* Auth Group */}
@@ -79,7 +84,7 @@ export default function RootLayout() {
             <Stack.Screen name="logOut" />
             <Stack.Screen name="(loading)/createWallet" />
             
-            {/* Add these if they are separate from tabs */}
+            {/* Other Screens */}
             <Stack.Screen name="enterAddress" options={{ presentation: 'card' }} />
             <Stack.Screen name="enterAmount" options={{ presentation: 'card' }} />
             <Stack.Screen name="confirmTransaction" options={{ presentation: 'card' }} />
@@ -95,16 +100,16 @@ export default function RootLayout() {
   );
 }
 
-// 5. Add styles for the splash screen container
+// Styles
 const styles = StyleSheet.create({
   splashContainer: {
     flex: 1,
-    backgroundColor: '#111111', // Matches your app.json splash background color
+    backgroundColor: '#111111', 
     alignItems: 'center',
     justifyContent: 'center',
   },
   lottie: {
-    width: 250, 
-    height: 250,
+    width: '100%', 
+    height: '100%', 
   },
 });

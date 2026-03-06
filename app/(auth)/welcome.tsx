@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import {Image} from 'expo-image';
+// 🛑 Removed expo-image and imported LottieView
+import LottieView from 'lottie-react-native'; 
 import {useRouter} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Ionicons} from '@expo/vector-icons';
@@ -57,11 +58,12 @@ export default function Welcome() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.mainContent}>
-            {/* Logo Section */}
+            {/* 🛑 Lottie Animation Section */}
             <View style={styles.logoContainer}>
-                <Image
-                    source={require('../../assets/icons/03.png')} 
-                    contentFit="contain"
+                <LottieView
+                    source={require('../../assets/animations/welcome2.json')} 
+                    autoPlay
+                    loop
                     style={styles.logo}
                 />
             </View>
@@ -69,7 +71,7 @@ export default function Welcome() {
             {/* Text Section */}
             <View style={styles.textSection}>
                 <Text style={styles.title}>
-                    Welcome to <Text style={{color: COLORS.primary}}>CoinSafe</Text>
+                    Welcome to <Text style={{color: COLORS.primary}}>NiToken</Text>
                 </Text>
                 
                 <Text style={styles.subtitle}>
@@ -135,14 +137,16 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 40,
+    // Note: I left the shadow here, but if your Lottie animation has a transparent 
+    // background and casts a weird "square box" shadow, just delete these shadow lines!
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.1,
     shadowRadius: 30,
   },
   logo: {
-    width: width * 0.35,
-    height: width * 0.35,
+    width: width * 0.5, // Increased size slightly so the animation pops more
+    height: width * 0.5,
   },
   textSection: {
     alignItems: 'center',
