@@ -13,7 +13,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -94,7 +94,7 @@ export default function EditProfile() {
     const normalizedPhone = formatPhoneNumber(newPhone);
     
     try {
-      const response = await axios.patch(`${BASE_URL}/api/auth/profile/update/`, 
+      const response = await apiClient.patch(`${BASE_URL}/api/auth/profile/update/`, 
         { phone_number: normalizedPhone },
         { 
           headers: { 

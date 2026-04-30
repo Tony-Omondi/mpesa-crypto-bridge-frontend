@@ -1,4 +1,5 @@
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
+
 import {useEffect, useRef, useState} from 'react';
 
 import {URLS} from '../config';
@@ -62,7 +63,7 @@ export const useGetBalances = () => {
         listOfTokens: listOfTokens,
         network: network,
       };
-      const response = await axios.post(URLS.GET_BALANCES, data);
+      const response = await apiClient.post(URLS.GET_BALANCES, data);
 
       lastUpdateRef.current = now;
       dispatch(trc20TokensActions.updateTokenBalances(response.data));

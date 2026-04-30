@@ -1,4 +1,4 @@
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
 import {useRouter} from 'expo-router';
 import React, {useEffect} from 'react';
 import {useLocalSearchParams} from 'expo-router';
@@ -41,7 +41,7 @@ export default function Transfer() {
       console.log("🚀 Sending NIT via Django...");
       
       // CALL YOUR DJANGO ENDPOINT
-      const response = await axios.post(
+      const response = await apiClient.post(
         URLS.TRANSFER_NIT,
         {
           // Django Serializer expects these exact keys:

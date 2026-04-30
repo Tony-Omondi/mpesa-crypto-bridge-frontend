@@ -1,23 +1,19 @@
-// C:\Users\user\Desktop\mpesa-crypto-bridge-frontend\src\store\walletSlice.tsx
-
-import {persistReducer} from 'redux-persist';
-import {createSlice, PayloadAction} from '@reduxjs/toolkit';
+import { persistReducer } from 'redux-persist';
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// PrivateKey and MnemonicPhrase are NO LONGER stored here.
+// They live in expo-secure-store (encrypted) via secureStorage.ts
 type WalletState = {
   access: boolean;
-  privateKey: string | null;
   walletAddress: string | null;
-  mnemonicPhrase: string | null;
-  authToken: string | null;    // CRITICAL: Renamed from token to match your UI screens
-  refreshToken: string | null; // NEW: Added to store your 7-day Django Refresh Token
+  authToken: string | null;
+  refreshToken: string | null;
 };
 
 const initialState: WalletState = {
   access: false,
-  privateKey: null,
   walletAddress: null,
-  mnemonicPhrase: null,
   authToken: null,
   refreshToken: null,
 };
@@ -26,33 +22,22 @@ const walletSlice = createSlice({
   name: 'wallet',
   initialState,
   reducers: {
-    // Save the short-lived access token
     setAuthToken: (state, action: PayloadAction<string>) => {
       state.authToken = action.payload;
     },
-    // Save the long-lived refresh token
     setRefreshToken: (state, action: PayloadAction<string>) => {
       state.refreshToken = action.payload;
     },
-    setPrivateKey: (state, action: PayloadAction<string>) => {
-      state.privateKey = action.payload;
-      state.access = !!(state.walletAddress && state.privateKey && state.mnemonicPhrase);
-    },
     setWalletAddress: (state, action: PayloadAction<string>) => {
       state.walletAddress = action.payload;
-      state.access = !!(state.walletAddress && state.privateKey && state.mnemonicPhrase);
+      state.access = !!action.payload;
     },
-    setMnemonicPhrase: (state, action: PayloadAction<string>) => {
-      state.mnemonicPhrase = action.payload;
-      state.access = !!(state.walletAddress && state.privateKey && state.mnemonicPhrase);
-    },
-    resetWallet: state => {
-      state.privateKey = null;
+    resetWallet: (state) => {
       state.walletAddress = null;
-      state.mnemonicPhrase = null;
-      state.authToken = null;    // Clear access token on logout
-      state.refreshToken = null; // Clear refresh token on logout
+      state.authToken = null;
+      state.refreshToken = null;
       state.access = false;
+      // Note: Also call clearSecureStorage() from secureStorage.ts on logout!
     },
   },
 });
@@ -63,12 +48,10 @@ const persistConfig = {
 };
 
 export const {
-  setAuthToken, 
-  setRefreshToken, // Export the new action
-  resetWallet,
-  setPrivateKey,
+  setAuthToken,
+  setRefreshToken,
   setWalletAddress,
-  setMnemonicPhrase,
+  resetWallet,
 } = walletSlice.actions;
 
 export const walletReducer = persistReducer(persistConfig, walletSlice.reducer);

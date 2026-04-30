@@ -15,11 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { showMessage } from 'react-native-flash-message';
-import * as LocalAuthentication from 'expo-local-authentication'; 
-import { BlurView } from 'expo-blur'; 
-import LottieView from 'lottie-react-native'; // <-- IMPORTED LOTTIE
+import * as LocalAuthentication from 'expo-local-authentication';
+import { BlurView } from 'expo-blur';
+import LottieView from 'lottie-react-native';
 
 import { useAppSelector } from '@/src/store';
+import { getMnemonic } from '@/src/utils/secureStorage'; // ← NEW
 
 // --- THEME CONSTANTS ---
 const COLORS = {
@@ -35,9 +36,11 @@ const COLORS = {
 
 export default function MnemonicPhrase() {
   const router = useRouter();
-  const { mnemonicPhrase, access } = useAppSelector((state: any) => state.walletReducer);
-  const words = mnemonicPhrase ? mnemonicPhrase.split(' ') : [];
+  const { access } = useAppSelector((state: any) => state.walletReducer);
 
+  // ✅ Mnemonic is no longer in Redux — we load it from SecureStore on demand
+  const [mnemonicPhrase, setMnemonicPhrase] = useState<string | null>(null);
+  const [words, setWords] = useState<string[]>([]);
   const [isRevealed, setIsRevealed] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState(false);
 
@@ -47,7 +50,6 @@ export default function MnemonicPhrase() {
     }
   }, [access]);
 
-  // 1. Trigger Authentication (FaceID / Fingerprint / PIN)
   const handleUnlockPress = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -71,17 +73,25 @@ export default function MnemonicPhrase() {
     }
   };
 
-  // 2. Acknowledge Warning & Reveal
-  const handleConfirmReveal = () => {
+  const handleConfirmReveal = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowWarningModal(false);
-    setIsRevealed(true);
+
+    // ✅ Only load from SecureStore when user explicitly confirms
+    const phrase = await getMnemonic();
+    if (phrase) {
+      setMnemonicPhrase(phrase);
+      setWords(phrase.split(' '));
+      setIsRevealed(true);
+    } else {
+      showMessage({ message: "Could not load phrase", type: "danger" });
+    }
   };
 
   const copyToClipboard = async () => {
-    if (!isRevealed) return; 
+    if (!isRevealed || !mnemonicPhrase) return;
     Haptics.selectionAsync();
-    await Clipboard.setStringAsync(mnemonicPhrase || '');
+    await Clipboard.setStringAsync(mnemonicPhrase);
     showMessage({
       message: 'Copied',
       description: 'Recovery phrase copied to clipboard',
@@ -93,14 +103,11 @@ export default function MnemonicPhrase() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <TouchableOpacity 
-        onPress={() => router.back()} 
-        style={styles.backButton}
-      >
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Ionicons name="arrow-back" size={24} color={COLORS.textPrimary} />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>Recovery Phrase</Text>
-      <View style={{ width: 40 }} /> 
+      <View style={{ width: 40 }} />
     </View>
   );
 
@@ -109,7 +116,6 @@ export default function MnemonicPhrase() {
       <BlurView intensity={60} tint="dark" style={styles.modalOverlay}>
         <View style={styles.modalCard}>
           <View style={styles.modalIconContainer}>
-            {/* LOTTIE ANIMATION INTEGRATED HERE */}
             <LottieView
               source={require('@/assets/animations/eyes.json')}
               autoPlay
@@ -135,62 +141,58 @@ export default function MnemonicPhrase() {
       {renderHeader()}
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
+
         <View style={styles.warningCard}>
-            <View style={styles.warningIconBox}>
-                <Ionicons name="shield-checkmark" size={24} color={COLORS.primary} />
-            </View>
-            <View style={{flex: 1}}>
-                <Text style={styles.warningTitle}>Do not share this!</Text>
-                <Text style={styles.warningText}>
-                    Anyone with these words can steal your funds. Write them down and store them somewhere safe.
-                </Text>
-            </View>
+          <View style={styles.warningIconBox}>
+            <Ionicons name="shield-checkmark" size={24} color={COLORS.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.warningTitle}>Do not share this!</Text>
+            <Text style={styles.warningText}>
+              Anyone with these words can steal your funds. Write them down and store them somewhere safe.
+            </Text>
+          </View>
         </View>
 
         {!isRevealed ? (
-            <View style={styles.lockedContainer}>
-                <Ionicons name="lock-closed" size={48} color={COLORS.textSecondary} style={{ marginBottom: 16 }} />
-                <Text style={styles.lockedTitle}>Phrase Hidden</Text>
-                <Text style={styles.lockedText}>Tap the button below to authenticate and view your secret recovery phrase.</Text>
-                
-                <TouchableOpacity style={styles.unlockButton} onPress={handleUnlockPress}>
-                    <Ionicons name="finger-print" size={20} color={COLORS.background} />
-                    <Text style={styles.unlockButtonText}>Tap to Reveal</Text>
-                </TouchableOpacity>
-            </View>
+          <View style={styles.lockedContainer}>
+            <Ionicons name="lock-closed" size={48} color={COLORS.textSecondary} style={{ marginBottom: 16 }} />
+            <Text style={styles.lockedTitle}>Phrase Hidden</Text>
+            <Text style={styles.lockedText}>Tap the button below to authenticate and view your secret recovery phrase.</Text>
+            <TouchableOpacity style={styles.unlockButton} onPress={handleUnlockPress}>
+              <Ionicons name="finger-print" size={20} color={COLORS.background} />
+              <Text style={styles.unlockButtonText}>Tap to Reveal</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-            <View>
-                <View style={styles.gridContainer}>
-                    {words.map((word, index) => (
-                        <View key={index} style={styles.wordPill}>
-                            <Text style={styles.wordIndex}>{index + 1}</Text>
-                            <Text style={styles.wordText}>{word}</Text>
-                        </View>
-                    ))}
+          <View>
+            <View style={styles.gridContainer}>
+              {words.map((word, index) => (
+                <View key={index} style={styles.wordPill}>
+                  <Text style={styles.wordIndex}>{index + 1}</Text>
+                  <Text style={styles.wordText}>{word}</Text>
                 </View>
-                
-                <Text style={styles.footerNote}>
-                    Tap "Copy" below to save this to your clipboard temporarily.
-                </Text>
+              ))}
             </View>
+            <Text style={styles.footerNote}>
+              Tap "Copy" below to save this to your clipboard temporarily.
+            </Text>
+          </View>
         )}
-
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity 
-            style={[styles.copyButton, !isRevealed && { opacity: 0.5 }]} 
-            onPress={copyToClipboard}
-            disabled={!isRevealed}
+        <TouchableOpacity
+          style={[styles.copyButton, !isRevealed && { opacity: 0.5 }]}
+          onPress={copyToClipboard}
+          disabled={!isRevealed}
         >
-            <Ionicons name="copy-outline" size={20} color={!isRevealed ? COLORS.textSecondary : "#00332a"} />
-            <Text style={[styles.buttonText, !isRevealed && { color: COLORS.textSecondary }]}>Copy Phrase</Text>
+          <Ionicons name="copy-outline" size={20} color={!isRevealed ? COLORS.textSecondary : "#00332a"} />
+          <Text style={[styles.buttonText, !isRevealed && { color: COLORS.textSecondary }]}>Copy Phrase</Text>
         </TouchableOpacity>
       </View>
 
       {renderWarningModal()}
-
     </SafeAreaView>
   );
 }

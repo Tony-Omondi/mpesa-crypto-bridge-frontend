@@ -1,4 +1,5 @@
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
+
 import {useEffect, useRef, useState} from 'react';
 
 import {URLS} from '../config';
@@ -48,7 +49,7 @@ export const useGetTrxData = () => {
     console.log('STARTED FETCHING TRX DATA');
 
     try {
-      const response = await axios.post(URLS.GET_TRX_DATA, {
+      const response = await apiClient.post(URLS.GET_TRX_DATA, {
         walletAddress,
         network,
       });

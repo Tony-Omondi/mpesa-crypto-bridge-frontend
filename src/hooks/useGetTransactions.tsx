@@ -1,4 +1,5 @@
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
+
 import {useEffect, useState} from 'react';
 import {URLS} from '../config';
 import {useAppSelector} from '@/src/store';
@@ -32,7 +33,7 @@ export const useGetTransactions = (tokenId: string) => {
         console.log('contractAddress', contractAddress);
         url = `${URLS.MAIN_URL}transactions/${network}/${walletAddress}/${contractAddress}`;
       }
-      const response = await axios.get(url);
+      const response = await apiClient.get(url);
       setTransactions(response.data.data);
     } catch (error) {
       console.error('Error fetching transaction history:', error);

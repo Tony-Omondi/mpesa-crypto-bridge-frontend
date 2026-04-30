@@ -14,7 +14,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
 import LottieView from 'lottie-react-native';
 
 // Import your existing config and store
@@ -46,7 +46,7 @@ export default function SendScreen() {
     
     const fetchBalances = async () => {
         try {
-            const res = await axios.get(URLS.GET_BALANCE(walletAddress));
+            const res = await apiClient.get(URLS.GET_BALANCE(walletAddress));
             if (res.data && res.data.status === "Success") {
                 setNitBalance(res.data.balance_nit.toFixed(2));
                 setEthBalance(res.data.balance_eth.toFixed(4));

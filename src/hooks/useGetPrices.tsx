@@ -1,4 +1,5 @@
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
+
 import {useEffect, useRef, useState} from 'react';
 
 import {URLS} from '../config';
@@ -54,7 +55,7 @@ export const useGetPrices = () => {
     try {
       setIsLoading(true);
 
-      const response = await axios.post(
+      const response = await apiClient.post(
         URLS.GET_PRICES,
         {ids},
         {timeout: 10000},

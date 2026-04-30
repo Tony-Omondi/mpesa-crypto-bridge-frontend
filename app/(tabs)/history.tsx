@@ -13,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
+
 
 import { theme } from '@/src/constants';
 import { URLS } from '@/src/config';
@@ -48,7 +49,7 @@ export default function TransactionHistory() {
   const fetchHistory = async () => {
     try {
       // 1. Fetch Internal History (Django Backend)
-      const backendRes = await axios.get(URLS.TRANSACTION_HISTORY, {
+      const backendRes = await apiClient.get(URLS.TRANSACTION_HISTORY, {
         params: { wallet_address: walletAddress }
       });
       let combinedHistory = backendRes.data || [];
@@ -61,8 +62,8 @@ export default function TransactionHistory() {
           const tokenUrl = `https://api-sepolia.arbiscan.io/api?module=account&action=tokentx&address=${walletAddress}&page=1&offset=50&sort=desc`;
 
           const [ethRes, tokenRes] = await Promise.all([
-            axios.get(ethUrl),
-            axios.get(tokenUrl)
+            apiClient.get(ethUrl),
+            apiClient.get(tokenUrl)
           ]);
 
           let externalTxs: any[] = [];

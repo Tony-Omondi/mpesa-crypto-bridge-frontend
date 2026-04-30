@@ -13,11 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { showMessage } from 'react-native-flash-message';
-import axios from 'axios';
+import apiClient from '@/src/utils/apiClient';
+
 
 import { URLS } from '@/src/config';
 import { useAppDispatch } from '@/src/store';
 import { walletActions } from '@/src/store/walletSlice';
+import { savePrivateKey, saveMnemonic } from '@/src/utils/secureStorage'; // ← NEW
 
 // --- THEME CONSTANTS ---
 const COLORS = {
@@ -33,7 +35,6 @@ export default function CreateWallet() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   
-  // UX State: Show what the app is currently doing
   const [loadingStep, setLoadingStep] = useState(0);
   const steps = [
     "Generating cryptographic keys...",
@@ -42,11 +43,9 @@ export default function CreateWallet() {
     "Almost there..."
   ];
 
-  // Animation Values
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Start Pulsing Animation
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.2, duration: 1000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -54,67 +53,53 @@ export default function CreateWallet() {
       ])
     ).start();
 
-    if (!URLS.REGISTER) {
-      console.error("Critical Error: URLS.REGISTER is undefined.");
-      return;
-    }
     setupNewAccount();
   }, []);
 
   const setupNewAccount = async () => {
     try {
-      // Step 1: Logic Start
       setLoadingStep(0);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      const walletResponse = await axios.get(URLS.CREATE_WALLET);
+      const walletResponse = await apiClient.get(URLS.CREATE_WALLET);
       const { address, privateKey, mnemonic } = walletResponse.data;
       const finalPhrase = typeof mnemonic === 'object' ? mnemonic.phrase : mnemonic;
 
-      // Step 2: Intermediate
       setLoadingStep(1);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-      const randomSuffix = Math.floor(1000000 + Math.random() * 9000000); 
+      // ✅ Save sensitive data to encrypted SecureStore — NOT Redux
+      await savePrivateKey(privateKey);
+      await saveMnemonic(finalPhrase);
+
+      const randomSuffix = Math.floor(1000000 + Math.random() * 9000000);
       const uniqueTestPhone = `2547${randomSuffix}`;
 
-      // Step 3: Registration
       setLoadingStep(2);
-      const authResponse = await axios.post(URLS.REGISTER, {
+      const authResponse = await apiClient.post(URLS.REGISTER, {
         phone_number: uniqueTestPhone,
-        password: "secure_password_123", 
-        wallet_address: address, 
+        password: "secure_password_123",
+        wallet_address: address,
       });
 
       if (authResponse.data.status === "Account Created") {
         setLoadingStep(3);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        
-        // --- NEW JWT TOKEN LOGIC HERE ---
-        // Grab the access token and save it
-        dispatch(walletActions.setAuthToken(authResponse.data.access)); 
-        
-        // Optional but recommended: Save the refresh token to your store/secure storage
-        if (walletActions.setRefreshToken) {
-          dispatch(walletActions.setRefreshToken(authResponse.data.refresh));
-        }
 
+        // ✅ Only non-sensitive data goes to Redux
+        dispatch(walletActions.setAuthToken(authResponse.data.access));
+        dispatch(walletActions.setRefreshToken(authResponse.data.refresh));
         dispatch(walletActions.setWalletAddress(address));
-        dispatch(walletActions.setMnemonicPhrase(finalPhrase)); 
-        dispatch(walletActions.setPrivateKey(privateKey));
 
-        // Redirect
         setTimeout(() => {
-            router.replace({
-              pathname: '/(auth)/backupWallet',
-              params: { phrase: finalPhrase }
-            });
+          router.replace({
+            pathname: '/(auth)/backupWallet',
+            params: { phrase: finalPhrase }
+          });
         }, 1500);
       }
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-      
       showMessage({
         message: 'Setup Failed',
         description: 'We encountered an error creating your vault.',
@@ -130,32 +115,28 @@ export default function CreateWallet() {
       <StatusBar barStyle="light-content" />
       
       <View style={styles.content}>
-        {/* Pulsing Shield Icon */}
         <Animated.View style={[styles.iconWrapper, { transform: [{ scale: pulseAnim }] }]}>
           <View style={styles.glow} />
           <Ionicons name="shield-checkmark" size={80} color={COLORS.primary} />
         </Animated.View>
 
-        {/* Dynamic Text Section */}
         <View style={styles.textSection}>
-            <Text style={styles.title}>Creating Wallet</Text>
-            <Text style={styles.subtitle}>{steps[loadingStep]}</Text>
+          <Text style={styles.title}>Creating Wallet</Text>
+          <Text style={styles.subtitle}>{steps[loadingStep]}</Text>
         </View>
 
-        {/* Progress Dots */}
         <View style={styles.progressRow}>
-            {steps.map((_, i) => (
-                <View 
-                    key={i} 
-                    style={[
-                        styles.dot, 
-                        loadingStep === i ? styles.activeDot : (loadingStep > i ? styles.completedDot : styles.inactiveDot)
-                    ]} 
-                />
-            ))}
+          {steps.map((_, i) => (
+            <View 
+              key={i} 
+              style={[
+                styles.dot, 
+                loadingStep === i ? styles.activeDot : (loadingStep > i ? styles.completedDot : styles.inactiveDot)
+              ]} 
+            />
+          ))}
         </View>
 
-        {/* Traditional Indicator as secondary */}
         <ActivityIndicator size="small" color={COLORS.primary} style={{ marginTop: 40 }} />
       </View>
 
@@ -170,74 +151,16 @@ export default function CreateWallet() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
-  
-  iconWrapper: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  glow: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.primary,
-    opacity: 0.1,
-  },
-
-  textSection: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    color: COLORS.textPrimary,
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    color: COLORS.textSecondary,
-    fontSize: 15,
-    textAlign: 'center',
-    height: 20, 
-  },
-
-  progressRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 30,
-  },
-  dot: {
-    height: 4,
-    borderRadius: 2,
-  },
-  inactiveDot: {
-    width: 12,
-    backgroundColor: COLORS.border,
-  },
-  activeDot: {
-    width: 24,
-    backgroundColor: COLORS.primary,
-  },
-  completedDot: {
-    width: 12,
-    backgroundColor: COLORS.primary,
-    opacity: 0.5,
-  },
-
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-    paddingBottom: 40,
-  },
-  footerText: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
-    opacity: 0.5,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  }
+  iconWrapper: { justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
+  glow: { position: 'absolute', width: 100, height: 100, borderRadius: 50, backgroundColor: COLORS.primary, opacity: 0.1 },
+  textSection: { alignItems: 'center', gap: 8 },
+  title: { color: COLORS.textPrimary, fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  subtitle: { color: COLORS.textSecondary, fontSize: 15, textAlign: 'center', height: 20 },
+  progressRow: { flexDirection: 'row', gap: 8, marginTop: 30 },
+  dot: { height: 4, borderRadius: 2 },
+  inactiveDot: { width: 12, backgroundColor: COLORS.border },
+  activeDot: { width: 24, backgroundColor: COLORS.primary },
+  completedDot: { width: 12, backgroundColor: COLORS.primary, opacity: 0.5 },
+  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, paddingBottom: 40 },
+  footerText: { color: COLORS.textSecondary, fontSize: 12, fontWeight: '600', opacity: 0.5, textTransform: 'uppercase', letterSpacing: 1 },
 });
