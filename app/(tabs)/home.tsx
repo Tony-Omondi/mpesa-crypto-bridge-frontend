@@ -1,20 +1,15 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  RefreshControl,
-  TouchableOpacity,
-  StatusBar,
-  Dimensions,
-  Platform,
+  View, Text, ScrollView, StyleSheet, RefreshControl,
+  TouchableOpacity, StatusBar, Dimensions, Platform, AppState,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
+import { showMessage } from 'react-native-flash-message';
 
 import { theme } from '@/src/constants';
 import { URLS } from '@/src/config';
@@ -34,42 +29,48 @@ const COLORS = {
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',
+  request: '#3B82F6', // Nice blue for the Request button
 };
 
 export default function Home() {
   const router = useRouter();
-  const { walletAddress } = useAppSelector((state) => state.walletReducer);
+  const { walletAddress } = useAppSelector((state: any) => state.walletReducer);
 
   const [balance, setBalance] = useState('0.00');
   const [ethBalance, setEthBalance] = useState('0.0000');
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✅ Auto-refresh when app comes back to foreground
+  const appState = useRef(AppState.currentState);
+  React.useEffect(() => {
+    const sub = AppState.addEventListener('change', nextState => {
+      if (appState.current.match(/inactive|background/) && nextState === 'active') {
+        if (walletAddress) fetchData();
+      }
+      appState.current = nextState;
+    });
+    return () => sub.remove();
+  }, [walletAddress]);
+
   useFocusEffect(
     useCallback(() => {
-      if (walletAddress) {
-        fetchData();
-      }
+      if (walletAddress) fetchData();
     }, [walletAddress])
   );
 
   const fetchData = async () => {
     try {
       console.log("🔄 Fetching Home Data for:", walletAddress);
-
-      const balUrl = URLS.GET_BALANCE(walletAddress);
-      const balResponse = await apiClient.get(balUrl);
-
-      if (balResponse.data && balResponse.data.status === "Success") {
+      const balResponse = await apiClient.get(URLS.GET_BALANCE(walletAddress));
+      if (balResponse.data?.status === "Success") {
         setBalance(balResponse.data.balance_nit.toFixed(2));
         setEthBalance(balResponse.data.balance_eth.toFixed(4));
       }
-
       const histResponse = await apiClient.get(URLS.TRANSACTION_HISTORY, {
         params: { wallet_address: walletAddress }
       });
       setHistory(histResponse.data);
-
     } catch (error) {
       console.error("❌ Dashboard Sync Error:", error);
     }
@@ -81,21 +82,51 @@ export default function Home() {
     setRefreshing(false);
   };
 
+  // ✅ Copy wallet address to clipboard
+  const handleCopyAddress = async () => {
+    if (!walletAddress) return;
+    Haptics.selectionAsync();
+    await Clipboard.setStringAsync(walletAddress);
+    showMessage({
+      message: 'Address Copied!',
+      description: walletAddress,
+      type: 'success',
+      backgroundColor: COLORS.cardBg,
+      duration: 3000,
+    });
+  };
+
   const handleActionPress = (route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(route);
+    router.push(route as any);
+  };
+
+  // ✅ Tap transaction to see receipt
+  const handleTxPress = (item: any) => {
+    Haptics.selectionAsync();
+    router.push({
+      pathname: '/transactionReceipt',
+      params: {
+        id: item.id,
+        type: item.type,
+        amount: item.amount,
+        status: item.status,
+        tx_hash: item.tx_hash || '',
+        from_address: item.from_address || '',
+        to_address: item.to_address || '',
+        created_at: item.created_at,
+      }
+    });
   };
 
   const getTxUI = (item: any, currentWallet: string) => {
     const isDeposit = item.type === "DEPOSIT";
+    const isRequest = item.type === "REQUEST";
     const isSent = item.from_address?.toLowerCase() === currentWallet?.toLowerCase();
-
-    if (isDeposit) {
-      return { title: "M-Pesa Deposit", icon: "arrow-down-outline", color: COLORS.success, prefix: "+" };
-    }
-    if (isSent) {
-      return { title: "Sent NIT", icon: "arrow-up-outline", color: COLORS.error, prefix: "-" };
-    }
+    
+    if (isDeposit) return { title: "M-Pesa Deposit", icon: "arrow-down-outline", color: COLORS.success, prefix: "+" };
+    if (isRequest) return { title: "Payment Request", icon: "receipt-outline", color: COLORS.request, prefix: "+" };
+    if (isSent) return { title: "Sent NIT", icon: "arrow-up-outline", color: COLORS.error, prefix: "-" };
     return { title: "Received NIT", icon: "arrow-down-outline", color: COLORS.success, prefix: "+" };
   };
 
@@ -103,7 +134,7 @@ export default function Home() {
     <View style={styles.header}>
       <View style={styles.headerLeft}>
         <Text style={styles.greeting}>Overview</Text>
-        <TouchableOpacity style={styles.addressPill} onPress={() => { Haptics.selectionAsync(); }}>
+        <TouchableOpacity style={styles.addressPill} onPress={handleCopyAddress}>
           <Ionicons name="wallet-outline" size={14} color={COLORS.textSecondary} />
           <Text style={styles.walletAddr}>
             {walletAddress
@@ -113,7 +144,7 @@ export default function Home() {
           <Ionicons name="copy-outline" size={12} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.profileButton}>
+      <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
         <Image source={require('../../assets/icons/03.png')} style={styles.profileImage} />
       </TouchableOpacity>
     </View>
@@ -152,9 +183,11 @@ export default function Home() {
 
   const renderActions = () => (
     <View style={styles.actionsContainer}>
-      <ActionButton icon="arrow-down" label="Deposit" color={COLORS.success} onPress={() => handleActionPress('/(tabs)/deposit')} />
-      <ActionButton icon="paper-plane" label="Send" color={theme.colors.secondary || '#6366F1'} onPress={() => handleActionPress('/(tabs)/send')} />
-      <ActionButton icon="cash-outline" label="Withdraw" color={COLORS.error} onPress={() => handleActionPress('/(tabs)/withdraw')} />
+      <ActionButton icon="arrow-down" label="Deposit" color={COLORS.success} onPress={() => handleActionPress('/deposit')} />
+      <ActionButton icon="paper-plane" label="Send" color={theme.colors.secondary || '#6366F1'} onPress={() => handleActionPress('/send')} />
+      {/* ✅ New Request Button Added */}
+      <ActionButton icon="receipt-outline" label="Request" color={COLORS.request} onPress={() => handleActionPress('/requestPayment')} />
+      <ActionButton icon="cash-outline" label="Withdraw" color={COLORS.error} onPress={() => handleActionPress('/withdraw')} />
     </View>
   );
 
@@ -171,7 +204,7 @@ export default function Home() {
     <View style={styles.historySection}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/transactionHistory')}>
           <Text style={styles.seeAllText}>See All</Text>
         </TouchableOpacity>
       </View>
@@ -184,11 +217,16 @@ export default function Home() {
           <Text style={styles.emptySubText}>Your recent activity will appear here</Text>
         </View>
       ) : (
-        history.map((item: any, index: number) => {
+        history.slice(0, 5).map((item: any, index: number) => {
           const ui = getTxUI(item, walletAddress);
           const isPending = item.status === 'PENDING' || item.status === 'PAID_BUT_FAILED';
           return (
-            <View key={item.id ? `${item.type}-${item.id}` : index} style={styles.historyItem}>
+            <TouchableOpacity
+              key={item.id ? `${item.type}-${item.id}` : index}
+              style={styles.historyItem}
+              onPress={() => handleTxPress(item)}
+              activeOpacity={0.7}
+            >
               <View style={[styles.historyIcon, { backgroundColor: `${ui.color}15` }]}>
                 <Ionicons name={isPending ? "time-outline" : ui.icon as any} size={20} color={isPending ? COLORS.warning : ui.color} />
               </View>
@@ -198,10 +236,13 @@ export default function Home() {
                   {new Date(item.created_at).toLocaleDateString()} • {item.status}
                 </Text>
               </View>
-              <Text style={[styles.historyAmount, { color: ui.prefix === '+' ? COLORS.success : COLORS.textPrimary }]}>
-                {ui.prefix}{item.amount} NIT
-              </Text>
-            </View>
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <Text style={[styles.historyAmount, { color: ui.prefix === '+' ? COLORS.success : COLORS.textPrimary }]}>
+                  {ui.prefix}{item.amount} NIT
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={COLORS.textSecondary} />
+              </View>
+            </TouchableOpacity>
           );
         })
       )}
@@ -254,9 +295,11 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row' },
   gasBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, gap: 4 },
   gasText: { fontSize: 12, fontWeight: '700', color: COLORS.cardText, opacity: 0.9 },
-  actionsContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 32, marginBottom: 32 },
+  // Adjusted padding here so 4 buttons fit nicely
+  actionsContainer: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 32 },
   actionBtn: { alignItems: 'center', gap: 8 },
-  actionIconContainer: { width: 60, height: 60, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  // Shrunk icon container slightly to ensure 4 fit on smaller screens
+  actionIconContainer: { width: 56, height: 56, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   actionLabel: { color: COLORS.textSecondary, fontSize: 13, fontWeight: '600' },
   historySection: { paddingHorizontal: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

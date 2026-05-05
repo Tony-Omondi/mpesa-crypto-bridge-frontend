@@ -53,7 +53,8 @@
         {
           "cameraPermission": "Allow NIT to access your camera to scan wallet QR codes."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

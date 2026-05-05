@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   ScrollView,
@@ -7,21 +7,19 @@ import {
   StatusBar,
   Dimensions,
   TouchableOpacity,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
-// 🛑 Removed expo-image and imported LottieView
-import LottieView from 'lottie-react-native'; 
-import {useRouter} from 'expo-router';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Ionicons} from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { usePrivy } from '@privy-io/expo';
 
-import {theme} from '@/src/constants';
-import {useAppSelector} from '@/src/store';
+import { useAppSelector } from '@/src/store';
 
-const {width, height} = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-// --- THEME CONSTANTS ---
 const COLORS = {
   background: '#0F1115',
   primary: '#00D09C',
@@ -33,75 +31,111 @@ const COLORS = {
 
 export default function Welcome() {
   const router = useRouter();
-  const {access} = useAppSelector((state) => state.walletReducer);
+  const { access } = useAppSelector((state) => state.walletReducer);
 
+  // ── Privy SDK ──────────────────────────────────────────────────────────────
+  // `login` opens the Privy modal (Email / Google / Apple)
+  // `ready` is false until Privy has initialised — we disable the button until then
+  // `authenticated` is true if the user is already logged into Privy
+  const { login, ready, authenticated } = usePrivy();
+
+  // ── If user already has a valid JWT in Redux, skip straight to home ────────
   useEffect(() => {
     if (access) {
       router.replace('/(tabs)/home');
     }
   }, [access]);
 
-  const handlePress = (route: string) => {
+  // ── If Privy session is still active (e.g. app reopen), go to loading ──────
+  // The loading screen will verify with our backend and issue a fresh JWT
+  useEffect(() => {
+    if (ready && authenticated) {
+      router.replace('/(loading)/privyAuth');
+    }
+  }, [ready, authenticated]);
+
+  const handleGetStarted = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(route);
+    try {
+      // Opens the Privy sheet: Email / Google / Apple / SMS
+      // On success, `authenticated` becomes true → useEffect above fires
+      await login();
+    } catch (e) {
+      // User dismissed the sheet — do nothing
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
+
       {/* Background Decorative Glow */}
       <View style={styles.glow} />
 
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.mainContent}>
-            {/* 🛑 Lottie Animation Section */}
-            <View style={styles.logoContainer}>
-                <LottieView
-                    source={require('../../assets/animations/welcome2.json')} 
-                    autoPlay
-                    loop
-                    style={styles.logo}
-                />
-            </View>
-            
-            {/* Text Section */}
-            <View style={styles.textSection}>
-                <Text style={styles.title}>
-                    Welcome to <Text style={{color: COLORS.primary}}>NiToken</Text>
-                </Text>
-                
-                <Text style={styles.subtitle}>
-                    The safest way to manage your assets. Create a new wallet or restore an existing one to get started.
-                </Text>
-            </View>
+          {/* Animation */}
+          <View style={styles.logoContainer}>
+            <LottieView
+              source={require('../../assets/animations/welcome2.json')}
+              autoPlay
+              loop
+              style={styles.logo}
+            />
+          </View>
+
+          {/* Text */}
+          <View style={styles.textSection}>
+            <Text style={styles.title}>
+              Welcome to <Text style={{ color: COLORS.primary }}>NiToken</Text>
+            </Text>
+            <Text style={styles.subtitle}>
+              The safest way to send and receive money. No seed phrases. No crypto
+              knowledge needed. Just sign in and go.
+            </Text>
+          </View>
         </View>
 
-        {/* Action Section */}
+        {/* Buttons */}
         <View style={styles.footer}>
-            <TouchableOpacity 
-                style={styles.primaryBtn}
-                activeOpacity={0.8}
-                onPress={() => handlePress('/(loading)/createWallet')}
-            >
-                <Text style={styles.primaryBtnText}>Create New Wallet</Text>
-                <Ionicons name="add-circle-outline" size={20} color="#00332a" />
-            </TouchableOpacity>
 
-            <TouchableOpacity 
-                style={styles.secondaryBtn}
-                activeOpacity={0.7}
-                onPress={() => handlePress('/(auth)/restoreWithMnemonic')}
-            >
-                <Text style={styles.secondaryBtnText}>I already have a wallet</Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.legalText}>
-                By continuing, you agree to our Terms and Privacy Policy.
+          {/* ── PRIMARY: Get Started via Privy ─────────────────────────────── */}
+          {/* This single button replaces the old "Create New Wallet" +         */}
+          {/* "I already have a wallet" buttons. Privy handles both cases        */}
+          {/* automatically — new users get a fresh wallet, returning users      */}
+          {/* get their wallet restored. Mama mboga never sees a seed phrase.   */}
+          <TouchableOpacity
+            style={[styles.primaryBtn, !ready && styles.disabledBtn]}
+            activeOpacity={0.8}
+            onPress={handleGetStarted}
+            disabled={!ready}
+          >
+            {!ready ? (
+              <ActivityIndicator color="#00332a" />
+            ) : (
+              <>
+                <Text style={styles.primaryBtnText}>Get Started</Text>
+                <Ionicons name="arrow-forward-circle-outline" size={22} color="#00332a" />
+              </>
+            )}
+          </TouchableOpacity>
+
+          {/* Login methods hint */}
+          <View style={styles.loginMethodsRow}>
+            <Ionicons name="mail-outline" size={16} color={COLORS.textSecondary} />
+            <Ionicons name="logo-google" size={16} color={COLORS.textSecondary} />
+            <Ionicons name="logo-apple" size={16} color={COLORS.textSecondary} />
+            <Text style={styles.loginMethodsText}>
+              Continue with Email, Google, or Apple
             </Text>
+          </View>
+
+          <Text style={styles.legalText}>
+            By continuing, you agree to our Terms and Privacy Policy.
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -137,15 +171,13 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     marginBottom: 40,
-    // Note: I left the shadow here, but if your Lottie animation has a transparent 
-    // background and casts a weird "square box" shadow, just delete these shadow lines!
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.1,
     shadowRadius: 30,
   },
   logo: {
-    width: width * 0.5, // Increased size slightly so the animation pops more
+    width: width * 0.5,
     height: width * 0.5,
   },
   textSection: {
@@ -184,24 +216,23 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  disabledBtn: {
+    opacity: 0.5,
+  },
   primaryBtnText: {
     color: '#00332a',
     fontSize: 18,
     fontWeight: '700',
   },
-  secondaryBtn: {
-    height: 60,
-    borderRadius: 20,
+  loginMethodsRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
+    gap: 8,
   },
-  secondaryBtnText: {
-    color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+  loginMethodsText: {
+    color: COLORS.textSecondary,
+    fontSize: 13,
   },
   legalText: {
     color: COLORS.textSecondary,
